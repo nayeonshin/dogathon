@@ -32,3 +32,28 @@ export const HEADERS = [
   "Assigned Volunteer",
   "Meet & Greet",
 ] as const;
+
+export const FOSTER_SHEET_TITLE = `${ORG} — Foster applications`;
+
+export const FOSTER_HEADERS = [
+  "Applicant Name",
+  "Email",
+  "Phone",
+  "City",
+  "Dog (or Any)",
+  "Available from",
+  "Available until",
+  "Experience",
+  "Hours home",
+  "Housing",
+  "Outdoor space",
+  "Other pets",
+  "Children",
+  "Medication",
+  "Vet transport",
+  "Notes",
+  "Application Date",
+  "Status",
+  "Assigned Volunteer",
+  "Home Visit",
+] as const;
