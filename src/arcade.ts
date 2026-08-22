@@ -6,6 +6,7 @@
  */
 import Arcade from "@arcadeai/arcadejs";
 import { ARCADE_API_KEY, ARCADE_USER_ID, PROVIDER_LABELS, REQUIRED_TOOLS } from "./config.js";
+import type { CalendarIntent } from "./foster.js";
 
 const arcade = new Arcade({ apiKey: ARCADE_API_KEY });
 
@@ -168,4 +169,44 @@ export async function sendDemoEmail(app: { subject: string; body: string }) {
   });
   if (!result.success) throw new Error(String(result.output?.error ?? "send failed"));
   return result.output?.value;
+}
+
+/** The foster workflow's sole live external side effect.
+ *
+ * Matching, outreach, reminders, and Shelterluv reconciliation stay local. This
+ * call is reached only after the store has validated the staff-selected foster
+ * and slot and marked the action pending. */
+export async function createFosterHandoffEvent(intent: CalendarIntent) {
+  const attendee = fosterDemoAlias(intent.fosterId);
+  const result = await arcade.tools.execute({
+    tool_name: "GoogleCalendar_CreateEvent",
+    input: {
+      calendar_id: "primary",
+      summary: intent.summary,
+      description: `${intent.description}\n\nDemo foster contact: ${attendee}`,
+      start_datetime: intent.slot,
+      end_datetime: intent.end,
+      location: intent.location,
+      visibility: "private",
+      attendee_emails: [attendee],
+      send_notifications_to_attendees: "all",
+      add_google_meet: false,
+    },
+    user_id: ARCADE_USER_ID,
+  });
+  if (!result.success) {
+    throw new Error(String(result.output?.error ?? "Google Calendar provider failed"));
+  }
+
+  const value = (result.output?.value ?? {}) as Record<string, unknown>;
+  const executionId = String(result.execution_id ?? value.execution_id ?? value.id ?? "arcade-completed");
+  const eventReference = [value.htmlLink, value.html_link, value.event_id, value.id]
+    .find((item) => typeof item === "string") as string | undefined;
+  return { executionId, eventReference, attendee };
+}
+
+function fosterDemoAlias(fosterId: string) {
+  const [local, domain] = ARCADE_USER_ID.split("@");
+  if (!domain) return ARCADE_USER_ID;
+  return `${local}+dogathon-${fosterId}@${domain}`;
 }

@@ -18,6 +18,7 @@ import { streamSSE } from "hono/streaming";
 import { PORT, POLL_MS, SLACK_CHANNEL, ARCADE_USER_ID } from "./config.js";
 import {
   awaitConnect,
+  createFosterHandoffEvent,
   fetchApplications,
   providerState,
   sendDemoEmail,
@@ -37,11 +38,15 @@ import { completeGatewayAuth } from "./oauth.js";
 import { triage, type TriageEvent } from "./triage.js";
 import { formToEmail, GENUINE_SAMPLES, SPAM_SAMPLES } from "./applications.js";
 import { DOGS, ORG } from "./dogs.js";
+import { FosterDomainError, FosterPlacementStore, type FosterState } from "./foster.js";
+import { generateOutreachMessages, generatePlacementMessage } from "./foster-agent.js";
+import { FosterCalendarExecutionError, performCalendarAction } from "./foster-calendar.js";
 
 type Feed =
   | { type: "log"; level: "info" | "warn" | "error"; text: string }
   | { type: "email"; subject: string; from: string }
   | { type: "triage"; event: TriageEvent }
+  | { type: "foster"; state: FosterState }
   | { type: "tick"; at: number; every: number; ignored: number };
 
 const subscribers = new Set<(f: Feed) => void>();
@@ -55,6 +60,21 @@ const log = (text: string, level: "info" | "warn" | "error" = "info") => {
 };
 
 const app = new Hono();
+const fosterStore = new FosterPlacementStore();
+
+const publishFoster = () => {
+  const state = fosterStore.snapshot();
+  publish({ type: "foster", state });
+  return state;
+};
+
+function fosterError(c: Parameters<Parameters<typeof app.onError>[0]>[1], error: unknown) {
+  if (error instanceof FosterDomainError) {
+    return c.json({ ok: false, error: error.message, code: error.code }, error.status as 400 | 404 | 409);
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return c.json({ ok: false, error: message }, 500);
+}
 
 /** Serve a page from public/, substituting the brand.
  *
@@ -64,6 +84,8 @@ const page = (file: string) =>
   readFileSync(join(process.cwd(), "public", file), "utf8").replaceAll("{{ORG}}", ORG);
 
 app.get("/", (c) => c.html(page("index.html")));
+app.get("/foster", (c) => c.html(page("foster.html")));
+app.get("/foster/respond/:token", (c) => c.html(page("foster-response.html")));
 
 app.get("/api/state", async (c) => {
   const providers = await providerState();
@@ -232,6 +254,145 @@ app.post("/api/demo-email", async (c) => {
   }
 });
 
+app.get("/api/foster/state", (c) => c.json({ ok: true, state: fosterStore.snapshot() }));
+
+app.post("/api/foster/reset", (c) => {
+  const state = fosterStore.reset();
+  publish({ type: "foster", state });
+  return c.json({ ok: true, state });
+});
+
+app.post("/api/foster/requests", async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>();
+    fosterStore.createRequest({
+      deadline: typeof body.deadline === "string" ? body.deadline : undefined,
+      start: typeof body.start === "string" ? body.start : undefined,
+      end: typeof body.end === "string" ? body.end : undefined,
+      durationDays: typeof body.durationDays === "number" ? body.durationDays : undefined,
+      handoffLocation: typeof body.handoffLocation === "string" ? body.handoffLocation : undefined,
+    }, typeof body.actor === "string" ? body.actor : undefined);
+    return c.json({ ok: true, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/profiles/:id/availability", async (c) => {
+  try {
+    const body: Record<string, unknown> = await c.req.json<Record<string, unknown>>().catch(() => ({}));
+    fosterStore.refreshAvailability(c.req.param("id"), typeof body.actor === "string" ? body.actor : undefined);
+    return c.json({ ok: true, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/requests/:id/outreach/approve", async (c) => {
+  try {
+    const body = await c.req.json<{ action?: string; fosterIds?: string[]; actor?: string }>();
+    if (body.action === "approve") {
+      fosterStore.approveOutreach(c.req.param("id"), body.actor);
+    } else if (body.action === "prepare") {
+      const state = fosterStore.snapshot();
+      const selected = state.profiles.filter((profile) => body.fosterIds?.includes(profile.id));
+      const messages = await generateOutreachMessages(state.request, selected);
+      fosterStore.prepareOutreach(c.req.param("id"), body.fosterIds ?? [], messages, body.actor);
+    } else {
+      throw new FosterDomainError("Action must be prepare or approve", 400, "invalid_input");
+    }
+    return c.json({ ok: true, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.get("/api/foster/respond/:token", (c) => {
+  try {
+    return c.json({ ok: true, context: fosterStore.getResponseContext(c.req.param("token")) });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/respond/:token", async (c) => {
+  try {
+    const body = await c.req.json<{ answer: "yes" | "no" | "maybe"; preferredSlot?: string; question?: string }>();
+    fosterStore.submitResponse(c.req.param("token"), body);
+    return c.json({ ok: true, context: fosterStore.getResponseContext(c.req.param("token")), state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/requests/:id/select", async (c) => {
+  try {
+    const body = await c.req.json<{ primaryFosterId?: string; backupFosterId?: string; actor?: string }>();
+    fosterStore.selectPlacement(c.req.param("id"), body.primaryFosterId ?? "", body.backupFosterId ?? "", body.actor);
+    return c.json({ ok: true, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/requests/:id/reminders", async (c) => {
+  try {
+    const body = await c.req.json<{ kind?: "confirmation" | "reminder"; actor?: string }>();
+    if (body.kind !== "confirmation" && body.kind !== "reminder") {
+      throw new FosterDomainError("Kind must be confirmation or reminder", 400, "invalid_input");
+    }
+    const state = fosterStore.snapshot();
+    const profile = state.profiles.find((item) => item.id === state.placement.primaryFosterId);
+    if (!profile) throw new FosterDomainError("Select a primary foster first", 409, "invalid_transition");
+    const message = await generatePlacementMessage(body.kind, state.request, profile, state.placement.selectedSlot);
+    fosterStore.prepareReminder(c.req.param("id"), body.kind, message, body.actor);
+    return c.json({ ok: true, message, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/requests/:id/calendar", async (c) => {
+  try {
+    const body = await c.req.json<{ slot?: string; approved?: boolean; actor?: string }>();
+    const receipt = await performCalendarAction(
+      fosterStore,
+      c.req.param("id"),
+      body.slot ?? "",
+      body.approved === true,
+      createFosterHandoffEvent,
+      body.actor,
+    );
+    return c.json({ ok: true, attendee: receipt.attendee, state: publishFoster() });
+  } catch (error) {
+    if (error instanceof FosterCalendarExecutionError) {
+      publishFoster();
+      return c.json({ ok: false, error: error.message, retryable: true }, 502);
+    }
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/requests/:id/handoff", async (c) => {
+  try {
+    const body: { actor?: string } = await c.req.json<{ actor?: string }>().catch(() => ({}));
+    fosterStore.confirmHandoff(c.req.param("id"), body.actor);
+    return c.json({ ok: true, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
+app.post("/api/foster/requests/:id/close", async (c) => {
+  try {
+    const body = await c.req.json<{ actor?: string; shelterluvReference?: string }>();
+    fosterStore.close(c.req.param("id"), body.shelterluvReference ?? "", body.actor);
+    return c.json({ ok: true, state: publishFoster() });
+  } catch (error) {
+    return fosterError(c, error);
+  }
+});
+
 app.get("/api/events", (c) =>
   streamSSE(c, async (stream) => {
     const send = (f: Feed) => void stream.writeSSE({ data: JSON.stringify(f) });
@@ -286,6 +447,7 @@ async function poll() {
 serve({ fetch: app.fetch, port: PORT }, async (info) => {
   console.log(`\n  Console → http://localhost:${info.port}`);
   console.log(`  Public form → http://localhost:${info.port}/apply\n`);
+  console.log(`  Foster placement → http://localhost:${info.port}/foster\n`);
   console.log(`  Acting as: ${ARCADE_USER_ID}`);
   console.log(`  Slack channel: #${SLACK_CHANNEL}\n`);
 
