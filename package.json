@@ -1,0 +1,26 @@
+{
+  "name": "dogathon-starter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "tsx src/seed.ts",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "reset": "tsx src/reset.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.40",
+    "@arcadeai/arcadejs": "^2.4.1",
+    "@hono/node-server": "^2.1.1",
+    "@mastra/core": "^1.61.0",
+    "@mastra/mcp": "^1.17.1",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "dotenv": "^17.4.2",
+    "hono": "^4.13.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

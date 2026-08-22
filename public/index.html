@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ORG}} — intake</title>
+<style>
+  :root {
+    --bg: #07080a;
+    --ink: #f3f4f7;
+    --dim: #767d8e;
+    --dimmer: #4d5462;
+    --hair: rgba(255, 255, 255, 0.075);
+    --hair-lit: rgba(255, 255, 255, 0.15);
+    --pane: rgba(255, 255, 255, 0.026);
+    --mint: #4ff0ab;
+    --amber: #ffb454;
+    --red: #ff7a7a;
+    --blue: #8fb0ff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  html { -webkit-font-smoothing: antialiased; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Inter", "Segoe UI", sans-serif;
+    font-feature-settings: "ss01", "cv01";
+    padding: clamp(32px, 6vh, 76px) clamp(24px, 6vw, 90px) 80px;
+    overflow-x: hidden;
+  }
+
+  /* Ambient bloom. Two cool lights, far apart, barely there — the page should
+     feel lit rather than decorated. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -30vh -20vw;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(48vw 48vw at 12% -6%, rgba(79, 240, 171, 0.10), transparent 62%),
+      radial-gradient(56vw 56vw at 96% 108%, rgba(122, 140, 255, 0.10), transparent 64%);
+    filter: blur(20px);
+  }
+
+  /* Film grain. Kills the flatness of a pure-black projector fill. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0.032;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  main { max-width: 1180px; margin: 0 auto; }
+
+  /* ── type ─────────────────────────────────────────────────────────────── */
+
+  .eyebrow {
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dimmer);
+  }
+
+  h1 {
+    margin: 18px 0 0;
+    font-size: clamp(38px, 5.4vw, 66px);
+    font-weight: 550;
+    letter-spacing: -0.038em;
+    line-height: 1.02;
+    background: linear-gradient(174deg, #ffffff 8%, #a8adba 96%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .who {
+    margin-top: 14px;
+    font: 400 clamp(13px, 1.1vw, 15px)/1.5 var(--mono);
+    letter-spacing: 0.01em;
+    color: var(--dim);
+  }
+
+  .lede {
+    margin: 26px 0 0;
+    max-width: 34ch;
+    font-size: clamp(17px, 1.6vw, 21px);
+    line-height: 1.5;
+    letter-spacing: -0.012em;
+    color: #a9afbd;
+  }
+
+  /* ── header ───────────────────────────────────────────────────────────── */
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  .pulse {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 6px;
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  .pulse i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 0 0 rgba(79, 240, 171, 0.5);
+    animation: beat 2.4s var(--ease) infinite;
+  }
+  @keyframes beat {
+    0%   { box-shadow: 0 0 0 0 rgba(79, 240, 171, 0.45); }
+    70%  { box-shadow: 0 0 0 9px rgba(79, 240, 171, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(79, 240, 171, 0); }
+  }
+
+  /* ── section rule ─────────────────────────────────────────────────────── */
+
+  .rule {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 46px 0 20px;
+  }
+  .rule .lbl {
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dimmer);
+    white-space: nowrap;
+  }
+  .rule i {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--hair), transparent);
+  }
+
+  /* The heartbeat readout. Small, dim, always moving — it makes "the agent
+     looked and found nothing worth doing" a thing you can point at. */
+  .scan {
+    display: flex; align-items: center; gap: 9px;
+    font: 400 11.5px/1 var(--mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dimmer);
+    white-space: nowrap;
+    transition: color 0.3s;
+  }
+  .scan b { font-weight: 400; }
+  .scan em {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--dimmer);
+    transition: background 0.2s, box-shadow 0.4s;
+  }
+  .scan.hit { color: var(--dim); }
+  .scan.hit em {
+    background: var(--mint);
+    box-shadow: 0 0 10px rgba(79, 240, 171, 0.9);
+  }
+
+  /* ── status chips ─────────────────────────────────────────────────────── */
+
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 34px; }
+
+  .chip {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 18px 11px 15px;
+    border: 1px solid var(--hair);
+    border-radius: 999px;
+    background: var(--pane);
+    backdrop-filter: blur(14px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    font-size: clamp(14px, 1.15vw, 16px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: #cfd4e0;
+    animation: rise 0.5s var(--ease) both;
+  }
+  .chip .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--dimmer);
+    flex: none;
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+  .chip.on { color: var(--ink); border-color: rgba(79, 240, 171, 0.22); }
+  .chip.on .dot {
+    background: var(--mint);
+    box-shadow: 0 0 12px rgba(79, 240, 171, 0.85);
+  }
+  .chip.off .dot { background: var(--amber); box-shadow: 0 0 10px rgba(255, 180, 84, 0.5); }
+  .chip button { margin-left: 4px; padding: 6px 12px; font-size: 12px; }
+
+  /* ── controls ─────────────────────────────────────────────────────────── */
+
+  button {
+    font: 550 clamp(14px, 1.2vw, 16px)/1 inherit;
+    font-family: inherit;
+    letter-spacing: -0.01em;
+    color: #05070a;
+    background: linear-gradient(180deg, #6dfcbf, #34d996);
+    border: 0;
+    border-radius: 10px;
+    padding: 13px 22px;
+    cursor: pointer;
+    transition: transform 0.18s var(--ease), box-shadow 0.25s var(--ease),
+                background 0.25s, border-color 0.25s, opacity 0.2s;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset,
+                0 6px 24px -8px rgba(79, 240, 171, 0.5);
+  }
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset,
+                0 10px 34px -8px rgba(79, 240, 171, 0.65);
+  }
+  button:active:not(:disabled) { transform: translateY(0); }
+  button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+  button.big {
+    font-size: clamp(16px, 1.6vw, 20px);
+    padding: 19px 34px;
+    border-radius: 13px;
+  }
+
+  /* Hairline variants. Both keep an explicit color so no later rule can
+     repaint the label into its own background. */
+  button.ghost {
+    color: #d5dae6;
+    background: var(--pane);
+    border: 1px solid var(--hair);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  button.ghost:hover:not(:disabled) {
+    color: var(--ink);
+    border-color: var(--hair-lit);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  button.amber {
+    color: var(--amber);
+    background: rgba(255, 180, 84, 0.07);
+    border: 1px solid rgba(255, 180, 84, 0.3);
+    box-shadow: none;
+  }
+  button.amber:hover:not(:disabled) {
+    background: rgba(255, 180, 84, 0.13);
+    border-color: rgba(255, 180, 84, 0.5);
+    box-shadow: 0 8px 28px -12px rgba(255, 180, 84, 0.5);
+  }
+
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 34px; }
+  .hint { font: 400 13px/1.4 var(--mono); color: var(--dimmer); margin-left: 6px; }
+
+  /* ── gateway step ─────────────────────────────────────────────────────── */
+
+  .step {
+    margin-top: 22px;
+    padding: 20px 22px;
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    border: 1px solid var(--hair);
+    border-radius: 16px;
+    background: var(--pane);
+    backdrop-filter: blur(14px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    animation: rise 0.5s var(--ease) both;
+  }
+  .step label {
+    width: 100%;
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dimmer);
+    margin-bottom: 4px;
+  }
+  input[type=url] {
+    flex: 1 1 380px;
+    font: 400 clamp(13px, 1.1vw, 15px)/1.4 var(--mono);
+    color: var(--ink);
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    padding: 13px 15px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  input[type=url]::placeholder { color: var(--dimmer); }
+  input[type=url]:focus {
+    outline: none;
+    border-color: rgba(79, 240, 171, 0.45);
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* ── feed ─────────────────────────────────────────────────────────────── */
+
+  #feed {
+    position: relative;
+    max-height: 46vh;
+    overflow-y: auto;
+    padding: 4px 0 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hair) transparent;
+  }
+  #feed::-webkit-scrollbar { width: 6px; }
+  #feed::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 3px; }
+
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 16px;
+    padding: 5px 0;
+    animation: rise 0.42s var(--ease) both;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* One continuous hairline threading every event, with each glyph punching
+     through it. Reads as a single run rather than a pile of log lines. */
+  .rail {
+    position: relative;
+    display: flex; justify-content: center;
+    font: 400 13px/1 var(--mono);
+    color: var(--dimmer);
+  }
+  .rail::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: -6px; bottom: -6px;
+    width: 1px; margin-left: -0.5px;
+    background: var(--hair);
+  }
+  .rail b {
+    position: relative;
+    display: grid; place-items: center;
+    width: 20px; height: 22px;
+    background: var(--bg);
+    font-weight: 400;
+  }
+
+  .body { min-width: 0; letter-spacing: -0.005em; }
+  .body.mono {
+    font: 400 clamp(13px, 1.12vw, 16px)/1.55 var(--mono);
+    letter-spacing: 0;
+  }
+  .body.prose {
+    max-width: 78ch;
+    font-size: clamp(14px, 1.12vw, 16px);
+    color: #9aa1b1;
+  }
+  .kit { color: var(--dimmer); }
+
+  .k-tool .rail b { color: var(--blue); }
+  .k-tool .body { color: #cfd4e0; }
+  .k-ok .rail b { color: var(--mint); }
+  .k-ok .body { color: #b9c0cd; }
+  .k-fail .rail b, .k-fail .body { color: var(--red); }
+  .k-mail .rail b { color: var(--mint); }
+  .k-mail .body { color: var(--mint); font-weight: 500; }
+  .k-mail { margin-top: 12px; }
+  .k-reject .rail b, .k-reject .body { color: var(--amber); }
+  .k-reject .body { font-weight: 500; }
+  .k-note .body { color: var(--dim); }
+  .k-warn .rail b, .k-warn .body { color: var(--amber); }
+  .k-err .rail b, .k-err .body { color: var(--red); }
+  .k-done .rail b { color: var(--mint); }
+  .k-done .body { color: var(--mint); }
+
+  .body a { color: var(--mint); text-decoration: underline; text-underline-offset: 3px; }
+
+  .idle {
+    font: 400 14px/1 var(--mono);
+    color: var(--dimmer);
+    padding: 10px 0 10px 42px;
+  }
+  .idle::after {
+    content: "";
+    animation: dots 2s steps(4, end) infinite;
+  }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">{{ORG}}</div>
+      <h1>Application intake</h1>
+      <div class="who" id="who"></div>
+    </div>
+    <div class="pulse" id="pulse" hidden><i></i> Listening</div>
+  </header>
+
+  <!-- Phase 1: nothing connected. One button, two OAuth flows. -->
+  <section id="phase-connect" hidden>
+    <p class="lede">An agent that reads adoption applications and files them.
+      First, let it act on your behalf.</p>
+    <div class="actions">
+      <button id="connect" class="big">Connect</button>
+      <span class="hint" id="connect-hint"></span>
+    </div>
+  </section>
+
+  <!-- Phases 2 and 3: providers are connected, so show their status. -->
+  <div class="chips" id="chips" hidden></div>
+
+  <!-- Phase 2: point the agent at a gateway. -->
+  <section id="phase-gateway" hidden>
+    <div class="step">
+      <label for="gw">MCP gateway</label>
+      <input id="gw" type="url" placeholder="https://api.arcade.dev/mcp/your-gateway" />
+      <button id="setgw" class="ghost">Use gateway</button>
+      <button id="auth" disabled>Authorize</button>
+    </div>
+  </section>
+
+  <!-- Phase 3: live. -->
+  <section id="phase-ready" hidden>
+    <div class="actions">
+      <button id="send">Send application</button>
+      <button id="spam" class="amber">Send form spam</button>
+      <span class="hint">&larr; the agent should refuse this one</span>
+    </div>
+  </section>
+
+  <section id="live" hidden>
+    <div class="rule">
+      <span class="lbl">Activity</span><i></i>
+      <span class="scan" id="scan" hidden><em></em><b id="scan-text">idle</b></span>
+    </div>
+    <div id="feed"><div class="idle">Waiting for the first application</div></div>
+  </section>
+</main>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const feed = $("feed");
+let iApp = 0, iSpam = 0, phase = null, chipsRendered = null;
+
+/** One event = one row. `kind` drives colour and glyph; `mono` is for machine
+ *  text, prose for anything a human wrote — long model summaries are unreadable
+ *  in a monospace wall from the back of a room. */
+function row(kind, glyph, build, { mono = false, prose = false } = {}) {
+  $("live").hidden = false;
+  feed.querySelector(".idle")?.remove();
+
+  const el = document.createElement("div");
+  el.className = `row k-${kind}`;
+
+  const rail = document.createElement("span");
+  rail.className = "rail";
+  const g = document.createElement("b");
+  g.textContent = glyph;
+  rail.append(g);
+
+  const body = document.createElement("span");
+  body.className = `body${mono ? " mono" : ""}${prose ? " prose" : ""}`;
+  build(body);
+
+  el.append(rail, body);
+  feed.append(el);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+const text = (kind, glyph, str, opts) =>
+  row(kind, glyph, (b) => { b.textContent = str; }, opts);
+
+// MCP tools are namespaced by server, e.g. arcade_Slack_SendMessage.
+const pretty = (n) => n.replace(/^arcade[_.]/, "").replace(/_/g, " ");
+
+/** Toolkit dimmed, action bright: the eye lands on the verb. */
+function toolRow(kind, glyph, name, suffix = "") {
+  row(kind, glyph, (b) => {
+    const [kit, ...rest] = pretty(name).split(" ");
+    const k = document.createElement("span");
+    k.className = "kit";
+    k.textContent = `${kit} `;
+    b.append(k, document.createTextNode(rest.join(" ") + suffix));
+  }, { mono: true });
+}
+
+async function refresh() {
+  const s = await fetch("/api/state").then((r) => r.json());
+  $("who").textContent = `${s.userId} · #${s.channel}`;
+  phase = s.phase;
+
+  $("phase-connect").hidden = phase !== "connect";
+  $("phase-gateway").hidden = phase !== "gateway";
+  $("phase-ready").hidden = phase !== "ready";
+  $("pulse").hidden = phase !== "ready";
+  if (phase === "ready") $("live").hidden = false;
+
+  // Consent is one provider per click — the browser only honours one popup per
+  // user gesture, and after the fetch the gesture is already spent. So the
+  // button names the provider it is about to open, and renames itself when that
+  // one lands. The step count makes the second click expected rather than a
+  // surprise.
+  if (s.next) {
+    $("connect").textContent = `Connect ${s.next.label}`;
+    $("connect-hint").textContent =
+      s.step.total > 1 ? `step ${s.step.done + 1} of ${s.step.total}` : "";
+  }
+
+  // Hide the chips only while nothing at all is connected, so the first
+  // provider going green is visible while the second is still pending.
+  $("chips").hidden = phase === "connect" && s.step.done === 0;
+
+  const gw = $("gw");
+  if (!gw.value && s.gateway.url) gw.value = s.gateway.url;
+  // Authorize is meaningless until a gateway is set, and irrelevant entirely in
+  // header mode where the transport carries the credentials.
+  $("auth").hidden = !s.gateway.needsAuthorize;
+  $("auth").disabled = !s.gateway.configured;
+
+  const items = [...s.providers];
+  if (phase === "ready" || s.gateway.configured) {
+    items.push({ id: "gateway", label: "MCP gateway", connected: s.gateway.connected });
+  }
+
+  // Rebuild only when something actually changed. replaceChildren() makes new
+  // elements, which restarts their entrance animation — so re-rendering on
+  // every five-second poll made the chips slide in over and over.
+  const signature = JSON.stringify([phase, items]);
+  if (signature === chipsRendered) return;
+  chipsRendered = signature;
+
+  $("chips").replaceChildren(...items.map((it) => {
+    const chip = document.createElement("div");
+    chip.className = `chip ${it.connected ? "on" : "off"}`;
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    const label = document.createElement("span");
+    label.textContent = it.label;
+    chip.append(dot, label);
+    // Only surfaces if a grant was revoked after setup — rare. During the
+    // connect phase the main button is already offering this provider, and two
+    // controls for one action reads as a bug.
+    if (!it.connected && it.id !== "gateway" && phase !== "connect") {
+      const b = document.createElement("button");
+      b.className = "ghost";
+      b.textContent = "Reconnect";
+      b.addEventListener("click", (ev) => connect(ev, it.id));
+      chip.append(b);
+    }
+    return chip;
+  }));
+}
+
+async function connect(e, provider) {
+  const btn = e?.target;
+  if (btn) btn.disabled = true;
+  const qs = provider ? `?provider=${encodeURIComponent(provider)}` : "";
+  const r = await fetch(`/api/connect${qs}`, { method: "POST" }).then((x) => x.json());
+
+  if (!r.ok) {
+    text("err", "!", r.error ?? "Could not start authorization");
+  } else if (r.flow) {
+    const win = window.open(r.flow.url, "_blank", "noopener");
+    // A blocked popup is invisible unless we say so, and it looks exactly like
+    // a broken button.
+    if (!win) {
+      row("warn", "!", (b) => {
+        b.append(document.createTextNode(`Popup blocked. Open ${r.flow.label} consent: `));
+        const a = document.createElement("a");
+        a.href = r.flow.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = "click here";
+        b.append(a);
+      }, { prose: true });
+    }
+  }
+  if (btn) btn.disabled = false;
+  refresh();
+}
+
+$("connect").addEventListener("click", connect);
+
+$("setgw").addEventListener("click", async (e) => {
+  const url = $("gw").value.trim();
+  if (!url) return;
+  e.target.disabled = true;
+  const r = await fetch("/api/gateway", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url }),
+  }).then((x) => x.json());
+  if (!r.ok) text("err", "!", r.error ?? "Gateway rejected");
+  e.target.disabled = false;
+  refresh();
+});
+
+$("auth").addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  const r = await fetch("/api/authorize/gateway", { method: "POST" }).then((x) => x.json());
+  if (r.url) window.open(r.url, "_blank", "noopener");
+  else text("err", "!", r.error ?? "No authorization URL returned");
+  setTimeout(() => { e.target.disabled = false; refresh(); }, 1500);
+});
+
+async function send(kind, i) {
+  const r = await fetch(`/api/demo-email?kind=${kind}&i=${i}`, { method: "POST" }).then((x) => x.json());
+  if (!r.ok) text("err", "!", r.error ?? "Send failed");
+}
+
+$("send").addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  await send("application", iApp++);
+  setTimeout(() => { e.target.disabled = false; }, 2000);
+});
+
+$("spam").addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  await send("spam", iSpam++);
+  setTimeout(() => { e.target.disabled = false; }, 2000);
+});
+
+const LEVEL = { info: ["note", "·"], warn: ["warn", "!"], error: ["err", "!"] };
+
+new EventSource("/api/events").onmessage = (msg) => {
+  const f = JSON.parse(msg.data);
+
+  if (f.type === "log") {
+    const [kind, glyph] = LEVEL[f.level] ?? LEVEL.info;
+    text(kind, glyph, f.text, { prose: true });
+    refresh();
+  }
+
+  if (f.type === "tick") tick(f);
+
+  if (f.type === "email") {
+    working = true;
+    paint();
+    text("mail", "✉", f.subject);
+  }
+
+  if (f.type === "triage") {
+    const e = f.event;
+    if (e.kind === "tool") toolRow("tool", "→", e.name);
+    if (e.kind === "tool-result") toolRow(e.ok ? "ok" : "fail", e.ok ? "✓" : "✕", e.name, e.ok ? "" : " failed");
+    if (e.kind === "step") text("note", "", e.text, { prose: true });
+    if (e.kind === "rejected") text("reject", "⊘", `Not an application — ${e.reason}`, { prose: true });
+    if (e.kind === "done") text("done", "✓", "Triage complete");
+    if (e.kind === "error") text("err", "✕", e.message, { prose: true });
+    if (["done", "rejected", "error"].includes(e.kind)) { working = false; paint(); }
+  }
+};
+
+/** Poll heartbeat. Every check reports in, so a mailbox full of ordinary email
+ *  visibly costs the agent nothing: the dot blinks, the count stays put, and no
+ *  model is ever called. */
+let last = 0, every = 10000, checks = 0, working = false;
+
+function tick(f) {
+  last = Date.now();
+  every = f.every ?? every;
+  checks += 1;
+  const scan = $("scan");
+  scan.hidden = false;
+  scan.classList.add("hit");
+  setTimeout(() => scan.classList.remove("hit"), 450);
+  paint();
+}
+
+function paint() {
+  if (!last) return;
+  // Polling pauses while a run is in flight, so the countdown would sit at 0
+  // and read as a hang. Say what's actually happening instead.
+  if (working) {
+    $("scan-text").textContent = `${checks} checks · working`;
+    return;
+  }
+  const since = Math.round((Date.now() - last) / 1000);
+  const next = Math.max(0, Math.round((last + every - Date.now()) / 1000));
+  $("scan-text").textContent =
+    `${checks} checks · last ${since}s ago · next in ${next}s`;
+}
+
+setInterval(paint, 1000);
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
