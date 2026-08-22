@@ -7,8 +7,11 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "reset": "tsx src/reset.ts",
+    "platform:demo": "tsx src/platform-demo-server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/foster.test.ts src/rescue-ops.test.ts"
+    "test": "tsx --test src/foster.test.ts src/rescue-ops.test.ts",
+    "test:platform": "tsx --test tests/platform-core.test.ts tests/platform-integrations.test.ts tests/platform-http.test.ts tests/platform-ui.test.ts",
+    "test:all": "npm run test && npm run test:platform"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.40",

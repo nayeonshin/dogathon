@@ -10,6 +10,9 @@ node_modules/
 # The gateway URL used last run. Not secret, but it's yours, not the repo's.
 .arcade-gateway
 
+# Local plaintext store for the explicitly synthetic shared-platform demo.
+.rescueops-platform-demo.json
+
 # Python leftovers from the pre-Mastra version.
 .venv/
 __pycache__/

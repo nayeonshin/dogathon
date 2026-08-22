@@ -14,6 +14,12 @@ export const ARCADE_USER_ID = required("ARCADE_USER_ID");
 
 export const SLACK_CHANNEL = process.env.SLACK_CHANNEL ?? "adoptions";
 
+/** Channel the Slack foster bot lives in. Create it, join it, type `apply-foster`.
+ *  Hyphenated so Slack does not treat it as a slash command. Arcade posts as you,
+ *  so you have to be a member. */
+export const FOSTER_SLACK_CHANNEL =
+  process.env.FOSTER_SLACK_CHANNEL ?? "submit-foster-applications";
+
 /** Optional prefill for the gateway URL box. The gateway is entered in the UI at
  *  runtime, so this is a convenience for rehearsals, not a requirement. */
 export const GATEWAY_URL_DEFAULT = process.env.ARCADE_GATEWAY_URL
@@ -54,6 +60,8 @@ export const REQUIRED_TOOLS = [
   "GoogleSheets_CreateOrEditSpreadsheet",
   "GoogleCalendar_CreateEvent",
   "Slack_SendMessage",
+  "Slack_GetMessages",
+  "Slack_GetThreadMessages",
 ] as const;
 
 /** Friendly names for Arcade's provider ids. */

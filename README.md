@@ -55,9 +55,25 @@ model given eight.
 
 ## Running it
 
+### MNR shelter and RescueOps
+
 Open **http://localhost:4111** for the public MNR Dog Shelter site and
 **http://localhost:4111/ops** for the shared RescueOps dashboard, then open
-**http://localhost:4111/adoption-intake**. The intake UI reveals itself in three steps, because
+**http://localhost:4111/adoption-intake** for the adoption intake console.
+
+### Shared RescueOps platform — no credentials required
+
+To run the new synthetic, multi-organization adoption/foster platform without making any live provider calls:
+
+```bash
+npm run platform:demo
+```
+
+Open **http://localhost:4222/platform**. Approvals, simulated receipts, reminders, and the limited-field rescue-to-rescue handoff persist to a local ignored JSON file. The page explicitly labels its synthetic data, simulated integrations, and lack of production tenant security. See `docs/SHARED-PLATFORM-DEMO.md` for the five-minute flow and boundaries.
+
+### Ambient adoption intake
+
+The intake UI reveals itself in three steps, because
 each one has to succeed before the next makes sense:
 
 1. **Connect Google & Slack.** One button, two consent screens. Arcade issues
@@ -80,7 +96,9 @@ To demo the upstream roster intake first, open
 **http://localhost:4111/foster-intake** for the operator console and
 **http://localhost:4111/foster-apply** for the public foster-home application.
 This remains a mailbox-driven agent workflow parallel to adoption intake while
-sharing one server and one provider connection.
+sharing one server and one provider connection. From the foster intake console,
+**Call Slack bot** (or type `apply-foster` in `#submit-foster-applications`)
+asks the same questions in Slack, then emails intake so the agent can file it.
 
 Open **http://localhost:4111/foster** and follow the numbered workflow:
 
@@ -124,7 +142,7 @@ would pass them.
 | File | Job |
 | --- | --- |
 | `src/server.ts` | Hono server, the 10-second poll loop, SSE feed to the browser |
-| `src/arcade.ts` | Arcade SDK: pre-auth, the Gmail poll, the demo emails. **No agent logic.** |
+| `src/arcade.ts` | Arcade SDK: pre-auth, the Gmail poll, the demo emails, Slack bot plumbing. **No agent logic.** |
 | `src/gateway.ts` | The MCP gateway connection and its token store |
 | `src/oauth.ts` | The gateway's OAuth flow, driven by hand — see below |
 | `src/triage.ts` | The agent. A Mastra `Agent` whose tools all come from MCP. |
@@ -133,6 +151,7 @@ would pass them.
 | `src/rescue-ops.ts` | Shared five-dog inventory, people, application records, and review boundaries |
 | `src/fosters.ts` | Foster-home application samples and form-to-email composer |
 | `src/foster-triage.ts` | Foster-home intake agent for Sheet, Slack, Calendar, and draft reply |
+| `src/slack-bot.ts` | Slack foster bot: `apply-foster` Q&A in `#submit-foster-applications` |
 | `src/foster.ts` | Seeded state, deterministic foster rules, transitions, and receipts |
 | `src/foster-agent.ts` | Model-assisted message drafts with deterministic fallbacks |
 | `public/shelter.html` | Public MNR Dog Shelter landing page and five-dog inventory |

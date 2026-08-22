@@ -13,6 +13,9 @@ Today is ${today}. All times are America/Los_Angeles.
 
 You will be given ONE email that arrived through the rescue's FOSTER application
 form — not the adoption form. Foster applicants want to host a dog temporarily.
+Some of these emails were collected by a Slack bot asking the same questions as
+the website form; treat those as real applications. The body is the source of
+truth.
 
 FIRST, decide whether it is a real foster application. The form is public, so it
 catches spam: marketing pitches, SEO, CRM demos, crypto, and gibberish all arrive

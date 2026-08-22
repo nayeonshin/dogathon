@@ -15,7 +15,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 
-import { PORT, POLL_MS, SLACK_CHANNEL, ARCADE_USER_ID } from "./config.js";
+import { PORT, POLL_MS, SLACK_CHANNEL, FOSTER_SLACK_CHANNEL, ARCADE_USER_ID } from "./config.js";
 import {
   awaitConnect,
   createFosterHandoffEvent,
@@ -38,9 +38,11 @@ import {
 import { completeGatewayAuth } from "./oauth.js";
 import { triage, type TriageEvent } from "./triage.js";
 import { fosterTriage } from "./foster-triage.js";
+import { startFosterBot, tickFosterBot, type BotEvent } from "./slack-bot.js";
 import { formToEmail, GENUINE_SAMPLES, SPAM_SAMPLES } from "./applications.js";
 import { fosterFormToEmail, FOSTER_SAMPLES, FOSTER_SPAM } from "./fosters.js";
 import { DOGS, ORG } from "./dogs.js";
+import { createPlatformHttpApp } from "./platform/http.js";
 import { FosterDomainError, FosterPlacementStore, type FosterState } from "./foster.js";
 import { generateOutreachMessages, generatePlacementMessage } from "./foster-agent.js";
 import { FosterCalendarExecutionError, performCalendarAction } from "./foster-calendar.js";
@@ -102,15 +104,21 @@ const page = (file: string) =>
 function consolePage(kind: "adoption" | "foster") {
   const foster = kind === "foster";
   return page("index.html")
+    .replaceAll("{{PLATFORM_URL}}", `http://localhost:${PORT}/platform`)
     .replaceAll("{{CONSOLE_TITLE}}", foster ? "foster intake" : "intake")
     .replaceAll("{{HEADING}}", foster ? "Foster intake" : "Application intake")
     .replaceAll(
       "{{LEDE}}",
       foster
-        ? "An agent that reads foster applications and files them. First, let it act on your behalf."
+        ? "Join #submit-foster-applications and type apply-foster, or send a sample. Then the agent files the rest."
         : "An agent that reads adoption applications and files them. First, let it act on your behalf.",
     )
     .replaceAll("{{SEND_LABEL}}", foster ? "Send foster application" : "Send application")
+    .replaceAll("{{SPAM_LABEL}}", "Send form spam")
+    .replaceAll("{{SEND_HINT}}", "")
+    .replaceAll("{{BOT_ATTR}}", foster ? "" : "hidden")
+    .replaceAll("{{BOT_HINT}}", foster ? "← or type apply-foster in Slack" : "")
+    .replaceAll("{{SPAM_HINT}}", "← the agent should refuse this one")
     .replaceAll("{{IDLE}}", foster ? "Waiting for the first foster application" : "Waiting for the first application")
     .replaceAll("{{REJECT_PREFIX}}", foster ? "Not a foster application — " : "Not an application — ")
     .replaceAll("{{SIDE_LINK_URL}}", "/foster")
@@ -123,18 +131,22 @@ app.get("/internal.css", (c) => c.body(page("internal.css"), 200, { "content-typ
 app.get("/", (c) => c.html(page("shelter.html")));
 app.get("/ops", (c) => c.html(page("rescue-ops.html")));
 app.get("/adoption-intake", (c) => c.html(consolePage("adoption")));
+app.get("/platform", (c) => c.html(page("platform.html")));
+app.get("/platform.css", (c) => c.body(page("platform.css"), 200, { "content-type": "text/css; charset=utf-8" }));
+app.get("/platform.js", (c) => c.body(page("platform.js"), 200, { "content-type": "text/javascript; charset=utf-8" }));
+app.route("/api/platform", createPlatformHttpApp());
 app.get("/foster-intake", (c) => c.html(consolePage("foster")));
 app.get("/foster", (c) => c.html(page("foster.html")));
 app.get("/foster/respond/:token", (c) => c.html(page("foster-response.html")));
 
-function mountOps(h: Hono, subs: Set<(f: Feed) => void>, prefix = "/api") {
+function mountOps(h: Hono, subs: Set<(f: Feed) => void>, prefix = "/api", channel = SLACK_CHANNEL) {
 h.get(`${prefix}/state`, async (c) => {
   const providers = await providerState();
   const allConnected = providers.length > 0 && providers.every((p) => p.connected);
   const next = providers.find((p) => !p.connected) ?? null;
   return c.json({
     userId: ARCADE_USER_ID,
-    channel: SLACK_CHANNEL,
+    channel,
     phase: !allConnected ? "connect" : gatewayConnected() ? "ready" : "gateway",
     providers,
     next,
@@ -225,7 +237,7 @@ h.get(`${prefix}/events`, (c) =>
 }
 
 mountOps(app, adoptionSubs);
-mountOps(app, fosterSubs, "/api/foster-intake");
+mountOps(app, fosterSubs, "/api/foster-intake", FOSTER_SLACK_CHANNEL);
 
 /** Where the authorization server sends the browser back.
  *
@@ -317,6 +329,31 @@ app.post("/foster-apply", async (c) => {
   }
 });
 
+app.post("/api/foster-intake/slack-bot", async (c) => {
+  const wait = slackRetryAt - Date.now();
+  if (wait > 0) {
+    return c.json(
+      { ok: false, error: `Slack is rate-limited. Try again in ${Math.ceil(wait / 1000)}s.` },
+      429,
+    );
+  }
+  try {
+    await startFosterBot(onBot);
+    return c.json({ ok: true });
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    const retry = slackRetryAfterMs(error);
+    if (retry != null) {
+      slackRetryAt = Date.now() + retry + 2_000;
+      const friendly = `Slack is rate-limited. Try again in ${Math.round(retry / 1000)}s.`;
+      log(friendly, "warn");
+      return c.json({ ok: false, error: friendly }, 429);
+    }
+    log(`Could not start Slack foster bot: ${error}`, "error");
+    return c.json({ ok: false, error }, 500);
+  }
+});
+
 app.post("/api/foster-intake/demo-email", async (c) => {
   const params = new URL(c.req.url).searchParams;
   const spam = params.get("kind") === "spam";
@@ -328,7 +365,7 @@ app.post("/api/foster-intake/demo-email", async (c) => {
     log(
       spam
         ? `Foster form spam sent: ${sample.name}`
-        : `Foster application sent: ${sample.name} → ${sample.dog}`,
+        : `Foster application sent: ${sample.name}`,
     );
     return c.json({ ok: true });
   } catch (e) {
@@ -628,6 +665,56 @@ async function pollFoster() {
   }
 }
 
+let slackBusy = false;
+let lastSlackAuthWarn = 0;
+let slackRetryAt = 0;
+let lastSlackRateWarn = 0;
+
+function onBot(e: BotEvent) {
+  if (e.kind === "started") log(`Foster bot started in #${e.channel}. Answer in the thread.`);
+  if (e.kind === "ask") log(`Foster bot asked: ${e.title}`);
+  if (e.kind === "heard") log(`Foster bot heard: ${e.title}`);
+  if (e.kind === "submitted") log(`Foster bot emailed intake: ${e.subject}`);
+  if (e.kind === "cancelled") log("Foster bot cancelled.");
+}
+
+function slackRetryAfterMs(message: string): number | null {
+  const quoted = message.match(/"retry_after_ms"\s*:\s*(\d+)/);
+  if (quoted) return Number(quoted[1]);
+  if (/ratelimit|429/i.test(message)) return 60_000;
+  return null;
+}
+
+async function pollSlackBot() {
+  if (slackBusy || !gatewayConnected() || Date.now() < slackRetryAt) return;
+  slackBusy = true;
+  try {
+    await tickFosterBot(onBot);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const wait = slackRetryAfterMs(message);
+    if (wait != null) {
+      slackRetryAt = Date.now() + wait + 2_000;
+      if (Date.now() - lastSlackRateWarn > wait) {
+        lastSlackRateWarn = Date.now();
+        log(`Slack asked the foster bot to wait ${Math.round(wait / 1000)}s. Listening again after that.`, "warn");
+      }
+    } else if (/403|authorization required/i.test(message)) {
+      if (Date.now() - lastSlackAuthWarn > 60_000) {
+        lastSlackAuthWarn = Date.now();
+        log(
+          `Foster bot cannot read #${FOSTER_SLACK_CHANNEL}. Reconnect Slack on the foster console so it can read the channel, then type apply-foster.`,
+          "warn",
+        );
+      }
+    } else {
+      log(`Foster bot poll failed: ${message}`, "warn");
+    }
+  } finally {
+    slackBusy = false;
+  }
+}
+
 serve({ fetch: app.fetch, port: PORT }, async (info) => {
   console.log(`\n  MNR public shelter → http://localhost:${info.port}`);
   console.log(`  RescueOps dashboard → http://localhost:${info.port}/ops`);
@@ -637,7 +724,8 @@ serve({ fetch: app.fetch, port: PORT }, async (info) => {
   console.log(`  Foster application → http://localhost:${info.port}/foster-apply`);
   console.log(`  Foster placement → http://localhost:${info.port}/foster\n`);
   console.log(`  Acting as: ${ARCADE_USER_ID}`);
-  console.log(`  Slack channel: #${SLACK_CHANNEL}\n`);
+  console.log(`  Slack channel: #${SLACK_CHANNEL}`);
+  console.log(`  Foster Slack bot: #${FOSTER_SLACK_CHANNEL}  (type apply-foster)\n`);
 
   // Reconnect to the gateway used last time, with any tokens already on disk, so
   // a restart doesn't ask you to redo setup you already did.
@@ -645,4 +733,5 @@ serve({ fetch: app.fetch, port: PORT }, async (info) => {
 
   setInterval(() => void poll(), POLL_MS);
   setTimeout(() => setInterval(() => void pollFoster(), POLL_MS), Math.floor(POLL_MS / 2));
+  setTimeout(() => setInterval(() => void pollSlackBot(), POLL_MS), Math.floor(POLL_MS / 3));
 });

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="RescueOps shared multi-organization operator demo" />
+  <title>RescueOps — shared operations</title>
+  <link rel="stylesheet" href="/platform.css" />
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to workspace</a>
+
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="RescueOps home">
+      <span class="brand-mark" aria-hidden="true">R</span>
+      <span><strong>RescueOps</strong><small>shared operations</small></span>
+    </a>
+
+    <div class="org-control">
+      <label for="organization">Organization workspace</label>
+      <select id="organization">
+        <option value="harbor">Harbor Hope Rescue</option>
+        <option value="mission">Mission Valley Shelter</option>
+      </select>
+    </div>
+
+    <button class="icon-button" id="notification-button" type="button" aria-label="View three notifications">
+      <span aria-hidden="true">◌</span><b>3</b>
+    </button>
+  </header>
+
+  <div class="demo-disclosure" role="note">
+    <strong>Demonstration boundary</strong>
+    <span>This organization switcher shows <b>demo organization isolation, not production tenant security</b>. All records and people are synthetic.</span>
+  </div>
+
+  <div class="app-shell">
+    <nav class="sidebar" aria-label="Platform navigation">
+      <div class="org-identity">
+        <span class="org-avatar" id="org-avatar" aria-hidden="true">HH</span>
+        <span><strong id="org-name">Harbor Hope Rescue</strong><small>Coordinator workspace</small></span>
+      </div>
+
+      <ul>
+        <li><button class="nav-item is-active" type="button" data-view="cases" aria-current="page"><span aria-hidden="true">⌂</span>Cases <b id="case-count">3</b></button></li>
+        <li><button class="nav-item" type="button" data-view="approvals"><span aria-hidden="true">✓</span>Approvals <b id="approval-count">2</b></button></li>
+        <li><button class="nav-item" type="button" data-view="reminders"><span aria-hidden="true">◷</span>Reminders <b id="reminder-count">2</b></button></li>
+        <li><button class="nav-item" type="button" data-view="network"><span aria-hidden="true">⇄</span>Partner network <b id="network-count">1</b></button></li>
+      </ul>
+
+      <div class="integration-card">
+        <div class="eyebrow">Shared adapters</div>
+        <ul>
+          <li><i class="status-dot manual"></i> Gmail <span>simulated</span></li>
+          <li><i class="status-dot manual"></i> Calendar <span>simulated</span></li>
+          <li><i class="status-dot manual"></i> Sheets <span>simulated</span></li>
+          <li><i class="status-dot manual"></i> Shelterluv <span>manual receipt</span></li>
+          <li><i class="status-dot optional"></i> Slack <span>optional</span></li>
+        </ul>
+      </div>
+    </nav>
+
+    <main id="workspace" class="workspace" tabindex="-1">
+      <section class="workspace-heading" aria-labelledby="workspace-title">
+        <div>
+          <div class="eyebrow">Operations workspace</div>
+          <h1 id="workspace-title">Cases needing attention</h1>
+          <p id="workspace-summary">One shared control plane for adoption, foster, and partner handoffs.</p>
+        </div>
+        <div class="source-health" aria-label="Source health">
+          <span class="status-dot manual"></span>
+          <span><strong>Loading synthetic API</strong><small>No live providers</small></span>
+        </div>
+      </section>
+
+      <section class="view is-active" id="cases-view" data-view-panel="cases" aria-labelledby="case-tabs-label">
+        <div class="tabs-header">
+          <h2 id="case-tabs-label" class="sr-only">Case type</h2>
+          <div class="tabs" role="tablist" aria-label="Case type">
+            <button id="adoption-tab" role="tab" type="button" aria-selected="true" aria-controls="adoption-panel" data-workflow="adoption">Adoption <b>2</b></button>
+            <button id="foster-tab" role="tab" type="button" aria-selected="false" aria-controls="foster-panel" data-workflow="foster">Foster <b>1</b></button>
+          </div>
+          <span class="privacy-note">Private to <b id="privacy-org">Harbor Hope Rescue</b></span>
+        </div>
+
+        <div class="case-layout">
+          <aside class="case-list" aria-label="Cases">
+            <div class="case-list-heading">
+              <span id="case-list-label">Adoption cases</span>
+              <span>Updated</span>
+            </div>
+            <div id="case-items"></div>
+          </aside>
+
+          <article class="case-detail" id="case-detail" aria-live="polite">
+            <header class="case-header">
+              <div>
+                <div class="case-kicker"><span id="case-id">ADP-1048</span><span aria-hidden="true">·</span><span id="case-workflow">Adoption intake</span></div>
+                <h2 id="case-title">Maya Chen + Juniper</h2>
+                <p id="case-subtitle">Application has been screened and is ready for staff review.</p>
+              </div>
+              <span class="state-pill" id="case-status">Ready for approval</span>
+            </header>
+
+            <section class="context-strip" aria-labelledby="context-heading">
+              <h3 id="context-heading" class="sr-only">Case context and freshness</h3>
+              <dl>
+                <div><dt>Animal</dt><dd id="animal-name">Juniper · D-118</dd></div>
+                <div><dt>Person</dt><dd id="person-name">Maya Chen</dd></div>
+                <div><dt>Source</dt><dd id="source-name">Gmail application</dd></div>
+                <div><dt>Freshness</dt><dd id="freshness"><span class="freshness fresh">Fresh</span> 6 min ago</dd></div>
+                <div><dt>Owner</dt><dd id="case-owner">Tara · Adoption</dd></div>
+              </dl>
+            </section>
+
+            <section class="case-section" aria-labelledby="actions-heading">
+              <div class="section-heading">
+                <div><span class="eyebrow">Human control</span><h3 id="actions-heading">Proposed actions</h3></div>
+                <span class="section-meta">No action runs without named approval</span>
+              </div>
+              <div id="action-cards" class="action-list"></div>
+            </section>
+
+            <div class="detail-grid">
+              <section class="case-section" aria-labelledby="reminders-heading">
+                <div class="section-heading compact">
+                  <h3 id="reminders-heading">Reminders</h3>
+                  <button class="text-button" id="add-reminder" type="button">+ Add</button>
+                </div>
+                <div id="case-reminders" class="reminder-list"></div>
+              </section>
+
+              <section class="case-section" aria-labelledby="receipts-heading">
+                <div class="section-heading compact"><h3 id="receipts-heading">Receipts &amp; errors</h3></div>
+                <div id="receipt-list" class="receipt-list"></div>
+              </section>
+            </div>
+
+            <section class="case-section timeline-section" aria-labelledby="timeline-heading">
+              <div class="section-heading compact"><h3 id="timeline-heading">Event timeline</h3><span class="section-meta">Append-only demo history</span></div>
+              <ol id="event-timeline" class="timeline"></ol>
+            </section>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="approvals-view" data-view-panel="approvals" hidden aria-labelledby="approvals-view-heading">
+        <div class="empty-heading"><span class="eyebrow">Human control</span><h2 id="approvals-view-heading">Approval queue</h2><p>Consequential actions from every workflow, in one review surface.</p></div>
+        <div id="approval-queue" class="standalone-grid"></div>
+      </section>
+
+      <section class="view" id="reminders-view" data-view-panel="reminders" hidden aria-labelledby="reminders-view-heading">
+        <div class="empty-heading"><span class="eyebrow">Time-based work</span><h2 id="reminders-view-heading">Reminder queue</h2><p>Follow-ups and deadlines remain visible until resolved or rescheduled.</p></div>
+        <div id="reminder-queue" class="standalone-grid"></div>
+      </section>
+
+      <section class="view" id="network-view" data-view-panel="network" hidden aria-labelledby="network-heading">
+        <div class="empty-heading">
+          <span class="eyebrow">Controlled collaboration</span>
+          <h2 id="network-heading">Partner capacity exchange</h2>
+          <p>Limited request summaries are shared first. Personal foster data is never globally searchable.</p>
+        </div>
+
+        <div class="network-layout">
+          <section class="network-flow" aria-label="Cross-organization exchange status">
+            <div class="flow-step done"><span>1</span><div><strong>Capacity request</strong><small>Limited summary published</small></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step active" id="offer-step"><span>2</span><div><strong>Capacity offers</strong><small id="offer-step-text">One partner response</small></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step" id="grant-step"><span>3</span><div><strong>Share grant</strong><small id="grant-step-text">Awaiting named approval</small></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step" id="handoff-step"><span>4</span><div><strong>Handoff</strong><small id="handoff-step-text">Not scheduled</small></div></div>
+          </section>
+
+          <article class="network-request">
+            <div class="network-request-header">
+              <div><span class="eyebrow">Network request NET-204</span><h3>Temporary capacity for Luna</h3></div>
+              <span class="urgent-pill">Due in 18h</span>
+            </div>
+            <div class="shared-summary">
+              <strong>Information currently shared</strong>
+              <p>Medium adult dog · 3-night placement · quiet home requested · East Bay handoff</p>
+              <small>Excluded: foster names, contact details, medical attachments, private case notes</small>
+            </div>
+
+            <div class="offer-card" id="offer-card">
+              <div class="offer-org"><span class="org-avatar mission">MV</span><div><strong>Mission Valley Shelter</strong><small>Verified partner · replied 8 min ago</small></div></div>
+              <p>One quiet-room placement available through Monday. Handoff possible after 4:00 PM.</p>
+              <div class="capacity-facts"><span>1 space</span><span>3 nights</span><span>12 miles</span></div>
+              <div class="button-row">
+                <button class="secondary-button" type="button" id="decline-offer">Decline</button>
+                <button class="primary-button" type="button" id="review-offer">Review offer</button>
+              </div>
+            </div>
+
+            <div class="grant-card" id="grant-card" hidden>
+              <div><span class="eyebrow">Explicit share grant</span><h4>Approve handoff information?</h4></div>
+              <ul>
+                <li>Animal name</li>
+                <li>Species</li>
+                <li>Breed</li>
+              </ul>
+              <p class="safety-copy">This does not share foster rosters, applicant records, or unrelated case notes.</p>
+              <label for="approver-name">Named approver</label>
+              <input id="approver-name" type="text" value="Rahul · Harbor Hope" />
+              <div class="button-row">
+                <button class="secondary-button" type="button" id="cancel-grant">Cancel</button>
+                <button class="primary-button" type="button" id="approve-grant">Approve grant &amp; schedule handoff</button>
+              </div>
+            </div>
+
+            <div class="handoff-receipt" id="handoff-receipt" hidden role="status">
+              <span class="receipt-icon success" aria-hidden="true">✓</span>
+              <div><strong>Simulated handoff receipt</strong><p>Approved by <span id="receipt-approver">Rahul · Harbor Hope</span>. Calendar handoff proposed for 4:30 PM. No live provider action was executed.</p><small>Receipt SIM-NET-204-01 · shared fields recorded · organization histories kept separate</small></div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+  <script src="/platform.js" defer></script>
+</body>
+</html>

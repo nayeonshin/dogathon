@@ -9,14 +9,20 @@ one Arcade/Gmail/Calendar connection:
 | --- | --- |
 | `/` | Adoption intake operator console |
 | `/apply` | Public adoption application |
-| `/foster-intake` | Foster-home intake operator console |
+| `/foster-intake` | Foster-home intake operator console (form samples + Call Slack bot) |
 | `/foster-apply` | Public foster-home application |
 | `/foster` | Staff foster-placement dashboard |
 | `/foster/respond/:token` | Foster-facing response page |
+| `/platform` | Shared, multi-organization operations dashboard |
+| `/api/platform/*` | Shared platform records, actions, reminders, receipts, and network handoffs |
 
 Adoption and foster-home intake remain mailbox-driven agents. Foster placement
 is a deterministic, in-memory state machine with model-assisted copy and one
-staff-approved Calendar action.
+staff-approved Calendar action. The shared platform is a separate persistent
+demo domain with organization-scoped records, explicit approvals, typed action
+receipts, reminders, and limited-field rescue-to-rescue handoffs. It is mounted
+in the same runtime, but the intake and placement workflows do not yet write to
+that shared store.
 
 ## Capability status
 
@@ -57,17 +63,20 @@ staff-approved Calendar action.
 
 | Shared capability | Status | Why |
 | --- | --- | --- |
-| Animal record | Missing | Adoption uses `DOGS`; placement embeds a separate Luna record |
-| People records | Missing | Adoption/foster intake use Sheets; placement uses synthetic memory |
-| Gmail connection | Shared | All intake surfaces use the same Arcade identity and grant |
-| Calendar connection | Shared | Agents and placement use the same Arcade identity and grant |
-| Human approval controls | Partial | Strong in placement; adoption actions remain mostly autonomous |
-| Activity timeline | Partial | Intake SSE and placement receipts are separate event models |
-| Action receipts | Partial | Placement has receipts; intake relies on transient agent events |
-| Scheduling engine | Missing | Adoption uses model instructions; placement uses seeded slots |
-| Communication templates | Partial | Separate agent prompts and placement fallback copy |
+| Organization-scoped animal records | Implemented for shared demo | Persistent records exist, but intake `DOGS` and placement Luna are not yet reconciled into them |
+| Organization-scoped people records | Implemented for shared demo | Persistent people records exist, but Gmail/Sheets intake and placement profiles do not yet feed them |
+| Cross-rescue capacity exchange | Implemented for shared demo | Offers, explicit field-level grants, and human-accepted handoffs are persisted |
+| Gmail connection | Partial | Intake uses Arcade; shared-platform actions default to simulation and are not wired to that live grant |
+| Calendar connection | Partial | Intake and foster placement use Arcade; shared-platform Calendar actions default to simulation |
+| Human approval controls | Partial | Shared-platform and placement actions are gated; adoption intake remains mostly autonomous |
+| Activity timeline | Partial | Shared events persist, while intake SSE and placement events remain separate models |
+| Action receipts | Partial | Shared actions have typed persistent receipts and placement has receipts; intake relies on transient agent events |
+| Reminders | Implemented for shared demo | Deterministic, idempotent, cancellable reminders persist in the platform store |
+| Scheduling engine | Partial | Shared reminders exist, but adoption uses model instructions and placement uses seeded slots |
+| Communication templates | Partial | Separate agent prompts and placement fallback copy are not yet one shared template system |
 | Shelterluv adapter | Missing | Only a truthful manual placement attestation exists |
 | Metrics and reporting | Missing | No shared counters, funnel, or outcome reporting |
+| Production tenant security | Missing | Organization switching demonstrates isolation but is not authentication or authorization |
 
 ## Two-sided demo status
 
@@ -98,10 +107,13 @@ The two sides were built independently with different system boundaries:
 - The placement scope deliberately constrained outreach/reminders to previews
   and Shelterluv to manual attestation, so those actions have no delivery or
   provider adapter yet.
-- No shared database or domain service currently joins dogs, people, schedules,
-  activity, and receipts across both sides.
+- A shared JSON-backed demo domain now represents animals, people, cases,
+  actions, approvals, receipts, events, reminders, and network handoffs, but the
+  two workflow implementations are not yet connected to it.
 
-The next architectural milestone is a shared domain layer for `Animal`,
-`Person`, `Schedule`, `Communication`, and `ActionReceipt`, backed by one
-persistent store. That layer should feed both agents and the placement state
-machine before adding more autonomous actions.
+The next architectural milestone is convergence: make the intake agents and the
+placement state machine read and write the existing shared records and receipts,
+then remove their duplicate `DOGS`, synthetic-profile, in-memory, and transient
+event representations. Production authentication, encrypted durable storage,
+and verified provider adapters remain later gates; they should not be inferred
+from the synthetic organization switcher or simulated receipts.
