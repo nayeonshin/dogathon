@@ -2,13 +2,14 @@ import { join } from "node:path";
 import { Hono, type Context } from "hono";
 import { DEMO_ORGANIZATIONS, createDemoPlatform, type DemoOrganizationKey } from "./demo.js";
 import { PlatformError, ValidationError } from "./errors.js";
+import { RUNTIME_DATA_DIR } from "../config.js";
 
 export type PlatformHttpOptions = { filePath?: string };
 
 export function createPlatformHttpApp(options: PlatformHttpOptions = {}) {
   const app = new Hono();
   const filePath = options.filePath ?? process.env.RESCUEOPS_PLATFORM_DB
-    ?? join(process.cwd(), ".rescueops-platform-demo.json");
+    ?? join(RUNTIME_DATA_DIR, ".rescueops-platform-demo.json");
   const platform = createDemoPlatform(filePath);
 
   app.get("/health", async (c) => {

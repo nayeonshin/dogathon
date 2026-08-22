@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { OAuthStorage } from "@mastra/mcp";
+import { RUNTIME_DATA_DIR } from "./config.js";
 
 /** Mastra defaults to InMemoryOAuthStorage, which loses the gateway tokens the
  *  moment the process exits — and `npm run dev` runs `tsx watch`, so every file
@@ -11,7 +12,7 @@ import type { OAuthStorage } from "@mastra/mcp";
 export class FileOAuthStorage implements OAuthStorage {
   private data: Record<string, string> = {};
 
-  constructor(private path = join(process.cwd(), ".arcade-oauth.json")) {
+  constructor(private path = join(RUNTIME_DATA_DIR, ".arcade-oauth.json")) {
     if (existsSync(this.path)) {
       try {
         this.data = JSON.parse(readFileSync(this.path, "utf8"));

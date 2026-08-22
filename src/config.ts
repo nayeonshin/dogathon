@@ -43,6 +43,14 @@ export const GATEWAY_AUTH = (process.env.GATEWAY_AUTH ?? "oauth") as "oauth" | "
 export const PORT = Number(process.env.PORT ?? 4111);
 export const POLL_MS = Number(process.env.POLL_MS ?? 10_000);
 export const MODEL = process.env.MODEL ?? "anthropic/claude-sonnet-5";
+export const RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR
+  ?? (process.env.VERCEL ? "/tmp" : process.cwd());
+export const APP_BASE_URL = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "")
+  ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : `http://127.0.0.1:${PORT}`);
 
 /** Every tool this demo touches.
  *

@@ -16,18 +16,18 @@ import {
   ARCADE_USER_ID,
   GATEWAY_AUTH,
   GATEWAY_URL_DEFAULT,
-  PORT,
+  APP_BASE_URL,
+  RUNTIME_DATA_DIR,
 } from "./config.js";
 import { FileOAuthStorage } from "./oauth-storage.js";
 import { beginGatewayAuth, CLIENT_NAME, type ClientInfo, type Tokens } from "./oauth.js";
 
-/** Our own route on our own port. We own the server, so we get to read every
- *  query parameter the authorization server sends back — `iss` included, which
- *  is the whole reason this isn't Mastra's loopback server.
- *  RFC 8252 §8.3: literal 127.0.0.1 rather than `localhost`. */
-export const REDIRECT_URI = `http://127.0.0.1:${PORT}/oauth/callback`;
+/** Our own callback route lets us retain every OAuth query parameter, including
+ *  `iss`. Locally APP_BASE_URL uses the RFC 8252 loopback address; deployments
+ *  use their public HTTPS origin. */
+export const REDIRECT_URI = `${APP_BASE_URL}/oauth/callback`;
 
-const URL_FILE = join(process.cwd(), ".arcade-gateway");
+const URL_FILE = join(RUNTIME_DATA_DIR, ".arcade-gateway");
 
 type Live = { url: string; client: MCPClient; provider?: MCPOAuthClientProvider };
 

@@ -73,7 +73,7 @@ const log = (text: string, level: "info" | "warn" | "error" = "info") => {
   publishAll({ type: "log", level, text });
 };
 
-const app = new Hono();
+export const app = new Hono();
 const fosterStore = new FosterPlacementStore();
 const rescueOpsStore = new RescueOpsStore();
 
@@ -104,7 +104,7 @@ const page = (file: string) =>
 function consolePage(kind: "adoption" | "foster") {
   const foster = kind === "foster";
   return page("index.html")
-    .replaceAll("{{PLATFORM_URL}}", `http://localhost:${PORT}/platform`)
+    .replaceAll("{{PLATFORM_URL}}", "/platform")
     .replaceAll("{{CONSOLE_TITLE}}", foster ? "foster intake" : "intake")
     .replaceAll("{{HEADING}}", foster ? "Foster intake" : "Application intake")
     .replaceAll(
@@ -715,23 +715,27 @@ async function pollSlackBot() {
   }
 }
 
-serve({ fetch: app.fetch, port: PORT }, async (info) => {
-  console.log(`\n  MNR public shelter → http://localhost:${info.port}`);
-  console.log(`  RescueOps dashboard → http://localhost:${info.port}/ops`);
-  console.log(`  Adoption console → http://localhost:${info.port}/adoption-intake`);
-  console.log(`  Adoption form → http://localhost:${info.port}/apply`);
-  console.log(`  Foster intake console → http://localhost:${info.port}/foster-intake`);
-  console.log(`  Foster application → http://localhost:${info.port}/foster-apply`);
-  console.log(`  Foster placement → http://localhost:${info.port}/foster\n`);
-  console.log(`  Acting as: ${ARCADE_USER_ID}`);
-  console.log(`  Slack channel: #${SLACK_CHANNEL}`);
-  console.log(`  Foster Slack bot: #${FOSTER_SLACK_CHANNEL}  (type apply-foster)\n`);
+if (!process.env.VERCEL) {
+  serve({ fetch: app.fetch, port: PORT }, async (info) => {
+    console.log(`\n  MNR public shelter → http://localhost:${info.port}`);
+    console.log(`  RescueOps dashboard → http://localhost:${info.port}/ops`);
+    console.log(`  Adoption console → http://localhost:${info.port}/adoption-intake`);
+    console.log(`  Adoption form → http://localhost:${info.port}/apply`);
+    console.log(`  Foster intake console → http://localhost:${info.port}/foster-intake`);
+    console.log(`  Foster application → http://localhost:${info.port}/foster-apply`);
+    console.log(`  Foster placement → http://localhost:${info.port}/foster\n`);
+    console.log(`  Acting as: ${ARCADE_USER_ID}`);
+    console.log(`  Slack channel: #${SLACK_CHANNEL}`);
+    console.log(`  Foster Slack bot: #${FOSTER_SLACK_CHANNEL}  (type apply-foster)\n`);
 
-  // Reconnect to the gateway used last time, with any tokens already on disk, so
-  // a restart doesn't ask you to redo setup you already did.
-  if (await restoreGateway()) log("Gateway restored from last run.");
+    // Reconnect to the gateway used last time, with any tokens already on disk, so
+    // a restart doesn't ask you to redo setup you already did.
+    if (await restoreGateway()) log("Gateway restored from last run.");
 
-  setInterval(() => void poll(), POLL_MS);
-  setTimeout(() => setInterval(() => void pollFoster(), POLL_MS), Math.floor(POLL_MS / 2));
-  setTimeout(() => setInterval(() => void pollSlackBot(), POLL_MS), Math.floor(POLL_MS / 3));
-});
+    setInterval(() => void poll(), POLL_MS);
+    setTimeout(() => setInterval(() => void pollFoster(), POLL_MS), Math.floor(POLL_MS / 2));
+    setTimeout(() => setInterval(() => void pollSlackBot(), POLL_MS), Math.floor(POLL_MS / 3));
+  });
+}
+
+export default app;
