@@ -399,6 +399,18 @@
   }
   @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 
+  .side-link {
+    display: inline-block;
+    margin-top: 14px;
+    color: var(--mint);
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(79, 240, 171, 0.45);
+    padding-bottom: 5px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
@@ -411,6 +423,7 @@
       <div class="eyebrow">{{ORG}}</div>
       <h1>{{HEADING}}</h1>
       <div class="who" id="who"></div>
+      <a class="side-link" href="{{SIDE_LINK_URL}}">Open foster placement &rarr;</a>
     </div>
     <div class="pulse" id="pulse" hidden><i></i> Listening</div>
   </header>
