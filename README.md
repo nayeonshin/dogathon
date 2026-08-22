@@ -9,6 +9,17 @@ Every tool call goes through an [Arcade](https://arcade.dev) MCP gateway, so the
 agent acts **as you**, with your Google and Slack grants, and never holds a
 credential.
 
+The same server also includes a resettable **Foster Placement** thin slice at
+**http://localhost:4111/foster**. It demonstrates a staff-controlled loop from
+fresh foster availability through placement closure without changing the
+existing adoption intake demo.
+
+A companion **Foster Application Intake** runs at **http://localhost:4112**.
+Its public form at **http://localhost:4112/apply** feeds Gmail, then a dedicated
+foster-intake agent records qualified homes in the foster roster, alerts Slack,
+books a home visit, and drafts a reply. Together the demos cover intake first,
+then trustworthy placement coordination.
+
 ```
 public form  ──▶  Gmail  ──▶  poller (Arcade SDK)  ──▶  agent (MCP gateway)  ──┬─▶ Google Sheet
  /apply           inbox        every 10s                  Mastra + Claude      ├─▶ Slack
@@ -72,6 +83,32 @@ Put the two windows side by side. The form is the public internet; the console i
 the operator's view. Nothing connects them but a mailbox — `POST /apply` sends an
 email and stops. It does not call the agent.
 
+### Foster placement demo
+
+To demo the upstream roster intake first, open **http://localhost:4112** for the
+operator console and **http://localhost:4112/apply** for the public foster-home
+application. This remains a mailbox-driven agent workflow parallel to adoption
+intake.
+
+Open **http://localhost:4111/foster** and follow the numbered workflow:
+
+1. Create Luna's urgent request to run deterministic matching.
+2. Review Maya's eligible result, Jordan's hard household exclusion, and Priya's
+   stale availability. Confirm Priya's availability to make her eligible.
+3. Prepare targeted copy, approve it as staff, and open the generated response
+   links in separate browser tabs.
+4. Record Yes/No/Maybe responses and questions, then select a primary and backup.
+5. Approve the one live Calendar invitation, confirm handoff, and record the
+   manual Shelterluv attestation.
+
+Matching and safety eligibility are deterministic. The model only drafts
+outreach, confirmation, and reminder wording, with local fallback copy if model
+generation fails. Outreach and reminders are previews and are not sent. The
+approved Google Calendar event is the sole live external action. Shelterluv is
+not connected; closure creates a receipt reading `Manual confirmation - not
+connected to Shelterluv`. The Reset control restores the complete synthetic
+scenario.
+
 Two things worth trying:
 
 - **Send yourself an ordinary email.** The heartbeat keeps ticking, the check
@@ -100,8 +137,15 @@ would pass them.
 | `src/triage.ts` | The agent. A Mastra `Agent` whose tools all come from MCP. |
 | `src/applications.ts` | Sample applications, spam, and the form → email composer |
 | `src/dogs.ts` | The roster, and `ORG` — rename the whole thing from one line |
+| `src/fosters.ts` | Foster-home application samples and form-to-email composer |
+| `src/foster-triage.ts` | Foster-home intake agent for Sheet, Slack, Calendar, and draft reply |
+| `src/foster.ts` | Seeded state, deterministic foster rules, transitions, and receipts |
+| `src/foster-agent.ts` | Model-assisted message drafts with deterministic fallbacks |
 | `public/apply.html` | The public adoption form |
 | `public/index.html` | The operator console |
+| `public/foster.html` | Staff foster-placement dashboard |
+| `public/foster-apply.html` | Public foster-home application form on port 4112 |
+| `public/foster-response.html` | Mobile foster response page |
 
 The split between `arcade.ts` and everything else is the point. The Arcade API key
 and user id appear in exactly two files and are used for exactly two things:
