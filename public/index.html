@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>{{ORG}} — intake</title>
+<title>{{ORG}} — {{CONSOLE_TITLE}}</title>
 <style>
   :root {
     --bg: #07080a;
@@ -422,19 +422,18 @@
   <header>
     <div>
       <div class="eyebrow">{{ORG}}</div>
-      <h1>Application intake</h1>
+      <h1>{{HEADING}}</h1>
       <div class="who" id="who"></div>
     </div>
     <div>
-      <a class="platform-link" href="/platform">Shared platform →</a>
+      <a class="platform-link" href="{{PLATFORM_URL}}">Shared platform →</a>
       <div class="pulse" id="pulse" hidden><i></i> Listening</div>
     </div>
   </header>
 
   <!-- Phase 1: nothing connected. One button, two OAuth flows. -->
   <section id="phase-connect" hidden>
-    <p class="lede">An agent that reads adoption applications and files them.
-      First, let it act on your behalf.</p>
+    <p class="lede">{{LEDE}}</p>
     <div class="actions">
       <button id="connect" class="big">Connect</button>
       <span class="hint" id="connect-hint"></span>
@@ -457,7 +456,7 @@
   <!-- Phase 3: live. -->
   <section id="phase-ready" hidden>
     <div class="actions">
-      <button id="send">Send application</button>
+      <button id="send">{{SEND_LABEL}}</button>
       <button id="spam" class="amber">Send form spam</button>
       <span class="hint">&larr; the agent should refuse this one</span>
     </div>
@@ -468,7 +467,7 @@
       <span class="lbl">Activity</span><i></i>
       <span class="scan" id="scan" hidden><em></em><b id="scan-text">idle</b></span>
     </div>
-    <div id="feed"><div class="idle">Waiting for the first application</div></div>
+    <div id="feed"><div class="idle">{{IDLE}}</div></div>
   </section>
 </main>
 
@@ -679,7 +678,7 @@ new EventSource("/api/events").onmessage = (msg) => {
     if (e.kind === "tool") toolRow("tool", "→", e.name);
     if (e.kind === "tool-result") toolRow(e.ok ? "ok" : "fail", e.ok ? "✓" : "✕", e.name, e.ok ? "" : " failed");
     if (e.kind === "step") text("note", "", e.text, { prose: true });
-    if (e.kind === "rejected") text("reject", "⊘", `Not an application — ${e.reason}`, { prose: true });
+    if (e.kind === "rejected") text("reject", "⊘", `{{REJECT_PREFIX}}${e.reason}`, { prose: true });
     if (e.kind === "done") text("done", "✓", "Triage complete");
     if (e.kind === "error") text("err", "✕", e.message, { prose: true });
     if (["done", "rejected", "error"].includes(e.kind)) { working = false; paint(); }

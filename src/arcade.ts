@@ -125,11 +125,17 @@ export type Application = {
  *
  *  Throws on failure rather than returning [], so a broken search shows up in
  *  the log instead of looking like a quiet inbox. */
-export async function fetchApplications(maxResults = 5): Promise<Application[]> {
+export const ADOPTION_QUERY = 'in:inbox -subject:"Re:" subject:"New adoption application"';
+export const FOSTER_QUERY = 'in:inbox -subject:"Re:" subject:"New foster application"';
+
+export async function fetchApplications(
+  maxResults = 5,
+  query = ADOPTION_QUERY,
+): Promise<Application[]> {
   const result = await arcade.tools.execute({
     tool_name: "Gmail_SearchEmailsByQuery",
     input: {
-      query: 'in:inbox -subject:"Re:" subject:"New adoption application"',
+      query,
       max_results: maxResults,
       result_detail: "full",
     },

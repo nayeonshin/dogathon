@@ -35,6 +35,7 @@ export const GATEWAY_URL_DEFAULT = process.env.ARCADE_GATEWAY_URL
 export const GATEWAY_AUTH = (process.env.GATEWAY_AUTH ?? "oauth") as "oauth" | "headers";
 
 export const PORT = Number(process.env.PORT ?? 4111);
+export const FOSTER_PORT = Number(process.env.FOSTER_PORT ?? 4112);
 export const POLL_MS = Number(process.env.POLL_MS ?? 10_000);
 export const MODEL = process.env.MODEL ?? "anthropic/claude-sonnet-5";
 

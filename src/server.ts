@@ -15,10 +15,11 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 
-import { PORT, POLL_MS, SLACK_CHANNEL, ARCADE_USER_ID } from "./config.js";
+import { PORT, FOSTER_PORT, POLL_MS, SLACK_CHANNEL, ARCADE_USER_ID } from "./config.js";
 import {
   awaitConnect,
   fetchApplications,
+  FOSTER_QUERY,
   providerState,
   sendDemoEmail,
   startConnect,
@@ -35,7 +36,9 @@ import {
 } from "./gateway.js";
 import { completeGatewayAuth } from "./oauth.js";
 import { triage, type TriageEvent } from "./triage.js";
+import { fosterTriage } from "./foster-triage.js";
 import { formToEmail, GENUINE_SAMPLES, SPAM_SAMPLES } from "./applications.js";
+import { fosterFormToEmail, FOSTER_SAMPLES, FOSTER_SPAM } from "./fosters.js";
 import { DOGS, ORG } from "./dogs.js";
 import { createPlatformHttpApp } from "./platform/http.js";
 
@@ -45,17 +48,26 @@ type Feed =
   | { type: "triage"; event: TriageEvent }
   | { type: "tick"; at: number; every: number; ignored: number };
 
-const subscribers = new Set<(f: Feed) => void>();
-const publish = (f: Feed) => {
-  for (const send of subscribers) send(f);
+const adoptionSubs = new Set<(f: Feed) => void>();
+const fosterSubs = new Set<(f: Feed) => void>();
+
+const publishTo = (subs: Set<(f: Feed) => void>, f: Feed) => {
+  for (const send of subs) send(f);
+};
+const publishAdoption = (f: Feed) => publishTo(adoptionSubs, f);
+const publishFoster = (f: Feed) => publishTo(fosterSubs, f);
+const publishAll = (f: Feed) => {
+  publishAdoption(f);
+  publishFoster(f);
 };
 
 const log = (text: string, level: "info" | "warn" | "error" = "info") => {
   console.log(`[${level}] ${text}`);
-  publish({ type: "log", level, text });
+  publishAll({ type: "log", level, text });
 };
 
 const app = new Hono();
+const fosterApp = new Hono();
 
 /** Serve a page from public/, substituting the brand.
  *
@@ -64,14 +76,31 @@ const app = new Hono();
 const page = (file: string) =>
   readFileSync(join(process.cwd(), "public", file), "utf8").replaceAll("{{ORG}}", ORG);
 
-app.get("/", (c) => c.html(page("index.html")));
+function consolePage(kind: "adoption" | "foster") {
+  const foster = kind === "foster";
+  return page("index.html")
+    .replaceAll("{{PLATFORM_URL}}", `http://localhost:${PORT}/platform`)
+    .replaceAll("{{CONSOLE_TITLE}}", foster ? "foster intake" : "intake")
+    .replaceAll("{{HEADING}}", foster ? "Foster intake" : "Application intake")
+    .replaceAll(
+      "{{LEDE}}",
+      foster
+        ? "An agent that reads foster applications and files them. First, let it act on your behalf."
+        : "An agent that reads adoption applications and files them. First, let it act on your behalf.",
+    )
+    .replaceAll("{{SEND_LABEL}}", foster ? "Send foster application" : "Send application")
+    .replaceAll("{{IDLE}}", foster ? "Waiting for the first foster application" : "Waiting for the first application")
+    .replaceAll("{{REJECT_PREFIX}}", foster ? "Not a foster application — " : "Not an application — ");
+}
 
+app.get("/", (c) => c.html(consolePage("adoption")));
 app.get("/platform", (c) => c.html(page("platform.html")));
 app.get("/platform.css", (c) => c.body(page("platform.css"), 200, { "content-type": "text/css; charset=utf-8" }));
 app.get("/platform.js", (c) => c.body(page("platform.js"), 200, { "content-type": "text/javascript; charset=utf-8" }));
 app.route("/api/platform", createPlatformHttpApp());
 
-app.get("/api/state", async (c) => {
+function mountOps(h: Hono, subs: Set<(f: Feed) => void>) {
+h.get("/api/state", async (c) => {
   const providers = await providerState();
   const allConnected = providers.length > 0 && providers.every((p) => p.connected);
   const next = providers.find((p) => !p.connected) ?? null;
@@ -103,7 +132,7 @@ const awaiting = new Set<string>();
  *  See startConnect() for why this isn't both at once. The client relabels its
  *  button from /api/state, so after Google completes the same button reads
  *  "Connect Slack". */
-app.post("/api/connect", async (c) => {
+h.post("/api/connect", async (c) => {
   const only = new URL(c.req.url).searchParams.get("provider") ?? undefined;
   try {
     const flow = await startConnect(only);
@@ -129,7 +158,7 @@ app.post("/api/connect", async (c) => {
 
 /** Point the agent at a gateway. A step the attendee performs and watches, which
  *  is why it lives in the UI rather than in .env. */
-app.post("/api/gateway", async (c) => {
+h.post("/api/gateway", async (c) => {
   const { url } = (await c.req.json()) as { url?: string };
   if (!url) return c.json({ ok: false, error: "No URL provided." }, 400);
   try {
@@ -145,7 +174,7 @@ app.post("/api/gateway", async (c) => {
 
 /** Starts the browser leg of the gateway OAuth flow and hands back the URL.
  *  The exchange happens in /oauth/callback below. */
-app.post("/api/authorize/gateway", async (c) => {
+h.post("/api/authorize/gateway", async (c) => {
   try {
     const url = await startGatewayAuth();
     log("Opening gateway authorization…");
@@ -156,6 +185,18 @@ app.post("/api/authorize/gateway", async (c) => {
     return c.json({ ok: false, error }, 400);
   }
 });
+
+h.get("/api/events", (c) =>
+  streamSSE(c, async (stream) => {
+    const send = (f: Feed) => void stream.writeSSE({ data: JSON.stringify(f) });
+    subs.add(send);
+    await new Promise<void>((resolve) => stream.onAbort(resolve));
+    subs.delete(send);
+  }),
+);
+}
+
+mountOps(app, adoptionSubs);
 
 /** Where the authorization server sends the browser back.
  *
@@ -218,6 +259,55 @@ app.post("/apply", async (c) => {
   }
 });
 
+/** Foster site on FOSTER_PORT. Same `/` console and `/apply` form as 4111. */
+const fosterPage = () => {
+  const options = DOGS.map(
+    (d) => `<option value="${d.name}">${d.name} — ${d.breed}, ${d.age}</option>`,
+  ).join("");
+  const samples = JSON.stringify({ genuine: FOSTER_SAMPLES, spam: FOSTER_SPAM });
+  return page("foster.html")
+    .replace("<!--DOGS-->", options)
+    .replace('"<!--SAMPLES-->"', samples);
+};
+
+mountOps(fosterApp, fosterSubs);
+fosterApp.get("/", (c) => c.html(consolePage("foster")));
+fosterApp.get("/apply", (c) => c.html(fosterPage()));
+
+fosterApp.post("/apply", async (c) => {
+  try {
+    const submission = (await c.req.json()) as Record<string, unknown>;
+    const { subject, body } = fosterFormToEmail(submission);
+    await sendDemoEmail({ subject, body });
+    console.log(`[info] foster form submission: ${subject}`);
+    return c.json({ ok: true });
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    log(`Foster form submission failed to send: ${error}`, "error");
+    return c.json({ ok: false, error }, 500);
+  }
+});
+
+fosterApp.post("/api/demo-email", async (c) => {
+  const params = new URL(c.req.url).searchParams;
+  const spam = params.get("kind") === "spam";
+  const pool = spam ? FOSTER_SPAM : FOSTER_SAMPLES;
+  const sample = pool[Number(params.get("i") ?? 0) % pool.length];
+  try {
+    await sendDemoEmail(fosterFormToEmail(sample));
+    log(
+      spam
+        ? `Foster form spam sent: ${sample.name}`
+        : `Foster application sent: ${sample.name} → ${sample.dog}`,
+    );
+    return c.json({ ok: true });
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    log(`Could not send foster demo: ${error}`, "error");
+    return c.json({ ok: false, error }, 500);
+  }
+});
+
 app.post("/api/demo-email", async (c) => {
   const params = new URL(c.req.url).searchParams;
   const spam = params.get("kind") === "spam";
@@ -237,15 +327,6 @@ app.post("/api/demo-email", async (c) => {
     return c.json({ ok: false, error }, 500);
   }
 });
-
-app.get("/api/events", (c) =>
-  streamSSE(c, async (stream) => {
-    const send = (f: Feed) => void stream.writeSSE({ data: JSON.stringify(f) });
-    subscribers.add(send);
-    await new Promise<void>((resolve) => stream.onAbort(resolve));
-    subscribers.delete(send);
-  }),
-);
 
 /** Emails already in the inbox when polling starts are NOT triaged.
  *
@@ -274,13 +355,13 @@ async function poll() {
     // Announce every check, including the boring ones. A silent server is
     // indistinguishable from a hung one, and "mail that isn't an application
     // costs nothing" is only convincing if you can watch the nothing happen.
-    publish({ type: "tick", at: Date.now(), every: POLL_MS, ignored: seen.size });
+    publishAdoption({ type: "tick", at: Date.now(), every: POLL_MS, ignored: seen.size });
 
     for (const application of applications.reverse()) {
       if (seen.has(application.id)) continue;
       seen.add(application.id);
-      publish({ type: "email", subject: application.subject, from: application.from });
-      await triage(application, (event) => publish({ type: "triage", event }));
+      publishAdoption({ type: "email", subject: application.subject, from: application.from });
+      await triage(application, (event) => publishAdoption({ type: "triage", event }));
     }
   } catch (e) {
     log(`Poll failed: ${e instanceof Error ? e.message : String(e)}`, "warn");
@@ -289,9 +370,42 @@ async function poll() {
   }
 }
 
+const fosterSeen = new Set<string>();
+let fosterPrimed = false;
+
+async function pollFoster() {
+  if (busy || !gatewayConnected()) return;
+  busy = true;
+  try {
+    const applications = await fetchApplications(5, FOSTER_QUERY);
+
+    if (!fosterPrimed) {
+      for (const a of applications) fosterSeen.add(a.id);
+      fosterPrimed = true;
+      log(`Watching for foster applications. Ignoring ${applications.length} already in the inbox.`);
+      return;
+    }
+
+    publishFoster({ type: "tick", at: Date.now(), every: POLL_MS, ignored: fosterSeen.size });
+
+    for (const application of applications.reverse()) {
+      if (fosterSeen.has(application.id)) continue;
+      fosterSeen.add(application.id);
+      publishFoster({ type: "email", subject: application.subject, from: application.from });
+      await fosterTriage(application, (event) => publishFoster({ type: "triage", event }));
+    }
+  } catch (e) {
+    log(`Foster poll failed: ${e instanceof Error ? e.message : String(e)}`, "warn");
+  } finally {
+    busy = false;
+  }
+}
+
 serve({ fetch: app.fetch, port: PORT }, async (info) => {
-  console.log(`\n  Console → http://localhost:${info.port}`);
-  console.log(`  Public form → http://localhost:${info.port}/apply\n`);
+  console.log(`\n  Adoption console → http://localhost:${info.port}`);
+  console.log(`  Adoption form → http://localhost:${info.port}/apply`);
+  console.log(`  Foster console → http://localhost:${FOSTER_PORT}`);
+  console.log(`  Foster form → http://localhost:${FOSTER_PORT}/apply\n`);
   console.log(`  Acting as: ${ARCADE_USER_ID}`);
   console.log(`  Slack channel: #${SLACK_CHANNEL}\n`);
 
@@ -300,4 +414,7 @@ serve({ fetch: app.fetch, port: PORT }, async (info) => {
   if (await restoreGateway()) log("Gateway restored from last run.");
 
   setInterval(() => void poll(), POLL_MS);
+  setTimeout(() => setInterval(() => void pollFoster(), POLL_MS), Math.floor(POLL_MS / 2));
 });
+
+serve({ fetch: fosterApp.fetch, port: FOSTER_PORT });
