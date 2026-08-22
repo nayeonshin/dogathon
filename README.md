@@ -1,4 +1,4 @@
-# Dog-a-thon starter
+# MNR Dog Shelter / RescueOps
 
 An **ambient agent**: nobody prompts it. A dog rescue's adoption form emails an
 intake mailbox, a local server notices, and an agent handles the application end
@@ -55,7 +55,9 @@ model given eight.
 
 ## Running it
 
-Open **http://localhost:4111**. The UI reveals itself in three steps, because
+Open **http://localhost:4111** for the public MNR Dog Shelter site and
+**http://localhost:4111/ops** for the shared RescueOps dashboard, then open
+**http://localhost:4111/adoption-intake**. The intake UI reveals itself in three steps, because
 each one has to succeed before the next makes sense:
 
 1. **Connect Google & Slack.** One button, two consent screens. Arcade issues
@@ -93,11 +95,12 @@ Open **http://localhost:4111/foster** and follow the numbered workflow:
 
 Matching and safety eligibility are deterministic. The model only drafts
 outreach, confirmation, and reminder wording, with local fallback copy if model
-generation fails. Outreach and reminders are previews and are not sent. The
-approved Google Calendar event is the sole live external action. Shelterluv is
-not connected; closure creates a receipt reading `Manual confirmation - not
-connected to Shelterluv`. The Reset control restores the complete synthetic
-scenario.
+generation fails. Staff-approved outreach is sent to the authorized demo Gmail
+inbox with secure response links; confirmation and reminder messages remain
+local previews. An explicitly approved Google Calendar event is the other live
+external action. Shelterluv is not connected; closure creates a receipt reading
+`Manual confirmation - not connected to Shelterluv`. The Reset control restores
+the complete synthetic scenario.
 
 Two things worth trying:
 
@@ -127,12 +130,17 @@ would pass them.
 | `src/triage.ts` | The agent. A Mastra `Agent` whose tools all come from MCP. |
 | `src/applications.ts` | Sample applications, spam, and the form → email composer |
 | `src/dogs.ts` | The roster, and `ORG` — rename the whole thing from one line |
+| `src/rescue-ops.ts` | Shared five-dog inventory, people, application records, and review boundaries |
 | `src/fosters.ts` | Foster-home application samples and form-to-email composer |
 | `src/foster-triage.ts` | Foster-home intake agent for Sheet, Slack, Calendar, and draft reply |
 | `src/foster.ts` | Seeded state, deterministic foster rules, transitions, and receipts |
 | `src/foster-agent.ts` | Model-assisted message drafts with deterministic fallbacks |
+| `public/shelter.html` | Public MNR Dog Shelter landing page and five-dog inventory |
+| `public/shelter.css` | Shared warm public theme for the landing page and both forms |
+| `public/internal.css` | Shared RescueOps theme for staff-facing workflows |
 | `public/apply.html` | The public adoption form |
 | `public/index.html` | The operator console |
+| `public/rescue-ops.html` | Unified RescueOps inventory and record dashboard |
 | `public/foster.html` | Staff foster-placement dashboard |
 | `public/foster-apply.html` | Public foster-home application form |
 | `public/foster-response.html` | Mobile foster response page |

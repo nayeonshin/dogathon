@@ -44,6 +44,7 @@ import { DOGS, ORG } from "./dogs.js";
 import { FosterDomainError, FosterPlacementStore, type FosterState } from "./foster.js";
 import { generateOutreachMessages, generatePlacementMessage } from "./foster-agent.js";
 import { FosterCalendarExecutionError, performCalendarAction } from "./foster-calendar.js";
+import { RescueOpsStore } from "./rescue-ops.js";
 
 type Feed =
   | { type: "log"; level: "info" | "warn" | "error"; text: string }
@@ -72,6 +73,7 @@ const log = (text: string, level: "info" | "warn" | "error" = "info") => {
 
 const app = new Hono();
 const fosterStore = new FosterPlacementStore();
+const rescueOpsStore = new RescueOpsStore();
 
 const publishPlacementState = () => {
   const state = fosterStore.snapshot();
@@ -116,7 +118,11 @@ function consolePage(kind: "adoption" | "foster") {
     .replaceAll("{{API_PREFIX}}", foster ? "/api/foster-intake" : "/api");
 }
 
-app.get("/", (c) => c.html(consolePage("adoption")));
+app.get("/shelter.css", (c) => c.body(page("shelter.css"), 200, { "content-type": "text/css; charset=utf-8" }));
+app.get("/internal.css", (c) => c.body(page("internal.css"), 200, { "content-type": "text/css; charset=utf-8" }));
+app.get("/", (c) => c.html(page("shelter.html")));
+app.get("/ops", (c) => c.html(page("rescue-ops.html")));
+app.get("/adoption-intake", (c) => c.html(consolePage("adoption")));
 app.get("/foster-intake", (c) => c.html(consolePage("foster")));
 app.get("/foster", (c) => c.html(page("foster.html")));
 app.get("/foster/respond/:token", (c) => c.html(page("foster-response.html")));
@@ -273,8 +279,9 @@ app.post("/apply", async (c) => {
     const submission = (await c.req.json()) as Record<string, unknown>;
     const { subject, body } = formToEmail(submission);
     await sendDemoEmail({ subject, body });
+    const record = rescueOpsStore.recordAdoptionApplication(submission);
     console.log(`[info] form submission: ${subject}`);
-    return c.json({ ok: true });
+    return c.json({ ok: true, recordId: record.id });
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     log(`Form submission failed to send: ${error}`, "error");
@@ -300,8 +307,9 @@ app.post("/foster-apply", async (c) => {
     const submission = (await c.req.json()) as Record<string, unknown>;
     const { subject, body } = fosterFormToEmail(submission);
     await sendDemoEmail({ subject, body });
+    const record = rescueOpsStore.recordFosterApplication(submission);
     console.log(`[info] foster form submission: ${subject}`);
-    return c.json({ ok: true });
+    return c.json({ ok: true, recordId: record.id });
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     log(`Foster form submission failed to send: ${error}`, "error");
@@ -316,6 +324,7 @@ app.post("/api/foster-intake/demo-email", async (c) => {
   const sample = pool[Number(params.get("i") ?? 0) % pool.length];
   try {
     await sendDemoEmail(fosterFormToEmail(sample));
+    rescueOpsStore.recordFosterApplication(sample, "demo_email");
     log(
       spam
         ? `Foster form spam sent: ${sample.name}`
@@ -336,6 +345,7 @@ app.post("/api/demo-email", async (c) => {
   const sample = pool[Number(params.get("i") ?? 0) % pool.length];
   try {
     await sendDemoEmail(formToEmail(sample));
+    rescueOpsStore.recordAdoptionApplication(sample, "demo_email");
     log(
       spam
         ? `Form spam sent: ${sample.name}`
@@ -348,6 +358,8 @@ app.post("/api/demo-email", async (c) => {
     return c.json({ ok: false, error }, 500);
   }
 });
+
+app.get("/api/rescue-ops/state", (c) => c.json({ ok: true, state: rescueOpsStore.snapshot() }));
 
 app.get("/api/foster/state", (c) => c.json({ ok: true, state: fosterStore.snapshot() }));
 
@@ -390,7 +402,34 @@ app.post("/api/foster/requests/:id/outreach/approve", async (c) => {
   try {
     const body = await c.req.json<{ action?: string; fosterIds?: string[]; actor?: string }>();
     if (body.action === "approve") {
-      fosterStore.approveOutreach(c.req.param("id"), body.actor);
+      const google = (await providerState()).find((provider) => provider.id === "arcade-google");
+      if (!google?.connected) {
+        throw new FosterDomainError("Connect Google before sending approved foster outreach", 409, "provider_not_connected");
+      }
+      const approved = fosterStore.approveOutreach(c.req.param("id"), body.actor);
+      const origin = new URL(c.req.url).origin;
+      const deliveries = await Promise.allSettled(approved.outreach.map((outreach) => {
+        const foster = approved.profiles.find((profile) => profile.id === outreach.fosterId);
+        const responseUrl = new URL(outreach.responsePath ?? "/foster", origin).toString();
+        return sendDemoEmail({
+          subject: `[MNR foster demo] Can you help ${approved.request.dog.name}?`,
+          body: `For ${foster?.displayName ?? "foster"}\n\n${outreach.message}\n\nRespond here: ${responseUrl}\n\nDemo delivery: sent to the authorized RescueOps inbox.`,
+        });
+      }));
+      const delivered = deliveries.filter((result) => result.status === "fulfilled").length;
+      const failed = deliveries.length - delivered;
+      fosterStore.recordOutreachDelivery(delivered, failed);
+      return c.json({
+        ok: true,
+        delivery: {
+          delivered,
+          failed,
+          summary: failed
+            ? `${delivered} demo email${delivered === 1 ? "" : "s"} sent; ${failed} failed`
+            : `${delivered} demo outreach email${delivered === 1 ? "" : "s"} sent`,
+        },
+        state: publishPlacementState(),
+      });
     } else if (body.action === "prepare") {
       const state = fosterStore.snapshot();
       const selected = state.profiles.filter((profile) => body.fosterIds?.includes(profile.id));
@@ -590,7 +629,9 @@ async function pollFoster() {
 }
 
 serve({ fetch: app.fetch, port: PORT }, async (info) => {
-  console.log(`\n  Adoption console → http://localhost:${info.port}`);
+  console.log(`\n  MNR public shelter → http://localhost:${info.port}`);
+  console.log(`  RescueOps dashboard → http://localhost:${info.port}/ops`);
+  console.log(`  Adoption console → http://localhost:${info.port}/adoption-intake`);
   console.log(`  Adoption form → http://localhost:${info.port}/apply`);
   console.log(`  Foster intake console → http://localhost:${info.port}/foster-intake`);
   console.log(`  Foster application → http://localhost:${info.port}/foster-apply`);

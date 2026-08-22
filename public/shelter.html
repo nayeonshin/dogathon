@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ORG}} - Find your dog</title>
+<link rel="stylesheet" href="/shelter.css" />
+</head>
+<body>
+<header class="public-nav">
+  <a class="public-brand" href="/"><span class="brand-mark">M</span><span>{{ORG}}</span></a>
+  <nav class="public-links" aria-label="Public navigation">
+    <a href="#dogs">Meet the dogs</a>
+    <a href="/apply">Adopt</a>
+    <a href="/foster-apply">Foster</a>
+    <a class="staff-link" href="/ops">Staff RescueOps</a>
+  </nav>
+</header>
+
+<main class="public-shell">
+  <section class="public-hero">
+    <div>
+      <div class="public-kicker">Small shelter. Big-hearted matches.</div>
+      <h1>A safe next chapter starts with <span>one good hello.</span></h1>
+      <p>Meet dogs cared for by MNR Dog Shelter, learn what they need, and take the next step with an application our team reads thoughtfully.</p>
+      <div class="hero-actions">
+        <a class="mnr-button primary" href="#dogs">Meet our dogs</a>
+        <a class="mnr-button secondary" href="/foster-apply">Open your home</a>
+      </div>
+    </div>
+    <div class="hero-art" aria-label="Playful illustration of a happy shelter dog">
+      <svg viewBox="0 0 460 430" role="img" aria-labelledby="mascotTitle">
+        <title id="mascotTitle">Happy MNR shelter dog mascot</title>
+        <path d="M120 138C72 108 69 48 104 35c27-10 59 30 71 66" fill="#a5ed6e" stroke="#3c3c3c" stroke-width="9" stroke-linejoin="round"/>
+        <path d="M340 138c48-30 51-90 16-103-27-10-59 30-71 66" fill="#a5ed6e" stroke="#3c3c3c" stroke-width="9" stroke-linejoin="round"/>
+        <path d="M99 201c0-84 57-134 131-134s131 50 131 134v73c0 81-58 127-131 127S99 355 99 274z" fill="#d7ffb8" stroke="#3c3c3c" stroke-width="9"/>
+        <ellipse cx="180" cy="205" rx="13" ry="18" fill="#3c3c3c"/><ellipse cx="280" cy="205" rx="13" ry="18" fill="#3c3c3c"/>
+        <path d="M204 243c13-12 39-12 52 0-5 22-47 22-52 0z" fill="#3c3c3c"/>
+        <path d="M190 278c24 25 56 25 80 0" fill="none" stroke="#3c3c3c" stroke-width="9" stroke-linecap="round"/>
+        <path d="M229 280v28c0 24 39 25 39 0v-13" fill="#ff8f70" stroke="#3c3c3c" stroke-width="8" stroke-linejoin="round"/>
+        <circle cx="151" cy="252" r="19" fill="#ffffff" opacity=".75"/><circle cx="309" cy="252" r="19" fill="#ffffff" opacity=".75"/>
+        <path d="M93 317c-39 6-57 32-44 52 15 24 52 8 67-16" fill="none" stroke="#3c3c3c" stroke-width="10" stroke-linecap="round"/>
+        <path d="M337 327c41-1 64 22 54 44-12 27-53 16-71-4" fill="none" stroke="#3c3c3c" stroke-width="10" stroke-linecap="round"/>
+      </svg>
+      <div class="hero-badge"><b>5 dogs</b>currently in our shared care inventory</div>
+    </div>
+  </section>
+
+  <section class="trust-strip" aria-label="Shelter commitments">
+    <div class="trust-item"><b>Human-reviewed</b><br>applications</div>
+    <div class="trust-item"><b>Clear care notes</b><br>before you commit</div>
+    <div class="trust-item"><b>Thoughtful matching</b><br>for every dog</div>
+  </section>
+
+  <section class="public-section" id="dogs">
+    <div class="section-heading"><div class="public-kicker">Ready for their next step</div><h2>Meet the MNR five.</h2><p>Every dog below is connected to the same record our coordinators use for applications, foster placement, scheduling, and follow-up.</p></div>
+    <div class="dog-grid" id="dogGrid"><p>Loading our dogs...</p></div>
+  </section>
+
+  <section class="public-section" id="start">
+    <div class="section-heading"><div class="public-kicker">Choose your path</div><h2>Help in the way that fits.</h2></div>
+    <div class="pathways">
+      <article class="pathway"><div class="path-icon">A</div><h3>Adopt a dog</h3><p>Tell us about your home and the dog who caught your eye. A volunteer will prepare a thoughtful next step.</p><a href="/apply">Start adoption application &rarr;</a></article>
+      <article class="pathway foster"><div class="path-icon">F</div><h3>Foster for a while</h3><p>Share your availability and what care you can take on. Even a short stay can make room for another rescue.</p><a href="/foster-apply">Start foster application &rarr;</a></article>
+    </div>
+  </section>
+</main>
+
+<footer class="public-footer"><div class="footer-inner"><div><h2>{{ORG}}</h2><p>Warm public care on the outside. Careful RescueOps coordination behind the scenes.</p></div><div class="footer-links"><b>Get involved</b><a href="/apply">Adopt</a><a href="/foster-apply">Foster</a></div><div class="footer-links"><b>For staff</b><a href="/ops">Open RescueOps</a><a href="/adoption-intake">Adoption intake</a></div></div></footer>
+
+<script>
+const esc=(value='')=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const label=value=>String(value).replaceAll('_',' ');
+async function loadDogs(){
+  const response=await fetch('/api/rescue-ops/state');
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||'Could not load dogs');
+  document.querySelector('#dogGrid').innerHTML=data.state.dogs.map(dog=>`<article class="public-dog"><div class="dog-sticker">${dog.photoUrl?`<img src="${esc(dog.photoUrl)}" alt="${esc(dog.name)}, ${esc(dog.breed)}" loading="lazy">`:esc(dog.name[0])}</div><div class="dog-info"><h3>${esc(dog.name)}</h3><div class="dog-meta">${esc(dog.breed)} / ${esc(dog.age)}</div><p>${esc(dog.summary)}</p><span class="status-pill ${esc(dog.status)}">${esc(label(dog.status))}</span></div></article>`).join('');
+}
+loadDogs().catch(error=>{document.querySelector('#dogGrid').innerHTML=`<p>${esc(error.message)}</p>`});
+</script>
+</body>
+</html>

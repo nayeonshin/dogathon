@@ -15,8 +15,8 @@ const daysAgo = (n: number) => {
 
 /** Applicants already mid-pipeline, so the Sheet isn't empty on a projector. */
 export const EXISTING_ROWS = [
-  ["Rosalind Ferreira", "r.ferreira.sf@example.com", "(415) 555-0182", "Olive", daysAgo(9), "Meet & greet done", "Dana", daysAgo(2)],
-  ["Kwame Boateng", "kboateng.home@example.com", "(510) 555-0147", "Waffles", daysAgo(6), "Reference check", "Ivy", ""],
+  ["Rosalind Ferreira", "r.ferreira.sf@example.com", "(415) 555-0182", "Marigold", daysAgo(9), "Meet & greet done", "Dana", daysAgo(2)],
+  ["Kwame Boateng", "kboateng.home@example.com", "(510) 555-0147", "Luna", daysAgo(6), "Reference check", "Ivy", ""],
   ["Sofia Mendelsohn-Park", "sofia.mp@example.com", "(628) 555-0119", "Juniper", daysAgo(4), "Scheduled", "Dana", daysAgo(-1)],
   ["Terrence Whitlock", "twhitlock42@example.com", "(415) 555-0164", "Marigold", daysAgo(2), "New", "", ""],
 ];
@@ -76,7 +76,7 @@ export const GENUINE_SAMPLES: FormSample[] = [
     name: "Hannah Lindqvist",
     email: "hannah.lindqvist@example.com",
     phone: "(510) 555-0188",
-    dog: "Waffles",
+    dog: "Luna",
     home: "House I rent",
     yard: "Unfenced yard",
     household: "Me and my partner. No kids, no pets.",
@@ -104,12 +104,12 @@ export const GENUINE_SAMPLES: FormSample[] = [
     name: "Rosalind Amherst",
     email: "r.amherst@example.com",
     phone: "(628) 555-0142",
-    dog: "Olive",
+    dog: "Marigold",
     home: "Apartment or condo",
     yard: "No yard",
     household: "Just me. I'm retired.",
     message:
-      "I read that Olive is nine and I want to say plainly that this is exactly why " +
+      "I read that Marigold is seven and I want to say plainly that this is exactly why " +
       "I'm writing. I'm 71, I walk two miles every morning, and a retired racer who " +
       "would rather nap than train for a marathon sounds like my kind of company. " +
       "Mornings are best for me, any day of the week.",
@@ -146,12 +146,12 @@ export const GENUINE_SAMPLES: FormSample[] = [
     name: "Bea Sullivan",
     email: "sullivan.family@example.com",
     phone: "(628) 555-0165",
-    dog: "Waffles",
+    dog: "Biscuit",
     home: "House I own",
     yard: "Fenced yard",
     household: "Three kids — 4, 8 and 11 — and a very tolerant cat named Admiral.",
     message:
-      "We're after a family dog and everything I've read about Waffles suggests he'd be " +
+      "We're after a family dog and everything I've read about Biscuit suggests he'd be " +
       "fine with the chaos. The cat is the open question and I'd rather find out before " +
       "than after. Big fenced yard, someone home most afternoons. It would have to be a " +
       "weekend so all three kids can come.",
@@ -217,7 +217,7 @@ export const SPAM_SAMPLES: FormSample[] = [
     name: "Bradley Vance",
     email: "b.vance@apexyieldcapital.test",
     phone: "(212) 555-0100",
-    dog: "Olive",
+    dog: "Marigold",
     home: "Other",
     yard: "No yard",
     household: "",
@@ -231,7 +231,7 @@ export const SPAM_SAMPLES: FormSample[] = [
     name: "PawsomeSupply Wholesale",
     email: "accounts@pawsomesupply.test",
     phone: "(888) 555-0143",
-    dog: "Waffles",
+    dog: "Biscuit",
     home: "Other",
     yard: "No yard",
     household: "N/A",

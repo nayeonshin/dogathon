@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { requireDog, type DogRecord, type DogSizeBand } from "./dogs.js";
 
 export type RequestState =
   | "draft"
@@ -28,23 +29,14 @@ export type FosterProfile = {
     expiresAt: string;
   };
   capacity: { maximum: number; current: number };
-  preferences: { sizeBands: string[]; durationDays: number[] };
+  preferences: { sizeBands: DogSizeBand[]; durationDays: number[] };
   household: { hasCats: boolean; hasDogs: boolean; childrenAges: number[] };
   qualifications: { handlingLevel: number; medicationCapable: boolean };
 };
 
 export type UrgentFosterRequest = {
   id: string;
-  dog: {
-    id: string;
-    name: string;
-    breed: string;
-    age: string;
-    sizeBand: string;
-    photoUrl: string;
-    summary: string;
-    careNotes: string[];
-  };
+  dog: DogRecord;
   state: RequestState;
   deadline: string;
   start: string;
@@ -140,21 +132,7 @@ const plusDays = (date: Date, days: number) => plusHours(date, days * 24);
 function initialState(now: Date): FosterState {
   const request: UrgentFosterRequest = {
     id: "foster_luna_001",
-    dog: {
-      id: "dog_luna",
-      name: "Luna",
-      breed: "Shepherd mix",
-      age: "4 years",
-      sizeBand: "large",
-      photoUrl: "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80",
-      summary: "A thoughtful, people-oriented dog who settles quickly outside the kennel.",
-      careNotes: [
-        "Cat-free home required",
-        "Handling level 2 or higher",
-        "Medication given with food",
-        "Use distance from unfamiliar dogs on walks",
-      ],
-    },
+    dog: requireDog("dog_luna"),
     state: "draft",
     deadline: plusHours(now, 3),
     start: plusHours(now, 5),
@@ -394,6 +372,23 @@ export class FosterPlacementStore {
     });
     this.state.request.state = "awaiting_responses";
     this.receipt("outreach_approved", actor, "success", "Staff approved targeted outreach previews", { externalAction: false });
+    return this.snapshot();
+  }
+
+  recordOutreachDelivery(delivered: number, failed: number, actor = "RescueOps Gmail adapter") {
+    this.requireState("awaiting_responses");
+    if (!Number.isInteger(delivered) || !Number.isInteger(failed) || delivered < 0 || failed < 0) {
+      throw new FosterDomainError("Delivery counts must be non-negative integers", 400, "invalid_input");
+    }
+    this.receipt(
+      "outreach_email_delivery",
+      actor,
+      failed ? "failed" : "success",
+      failed
+        ? `${delivered} demo outreach email${delivered === 1 ? "" : "s"} sent; ${failed} failed`
+        : `${delivered} demo outreach email${delivered === 1 ? "" : "s"} sent`,
+      { externalAction: true, delivered, failed, destination: "authorized demo inbox" },
+    );
     return this.snapshot();
   }
 

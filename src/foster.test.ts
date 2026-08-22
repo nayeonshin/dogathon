@@ -42,6 +42,9 @@ test("outreach requires eligible recipients and explicit approval", () => {
   const approved = store.approveOutreach("foster_luna_001");
   assert.equal(approved.request.state, "awaiting_responses");
   assert.ok(approved.outreach[0].responseToken);
+  const delivered = store.recordOutreachDelivery(1, 0);
+  assert.equal(delivered.receipts.at(-1)?.type, "outreach_email_delivery");
+  assert.equal(delivered.receipts.at(-1)?.details?.externalAction, true);
 });
 
 test("response links accept one idempotent answer and lock conflicting repeats", () => {

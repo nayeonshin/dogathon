@@ -416,8 +416,9 @@
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
 </style>
+<link rel="stylesheet" href="/internal.css" />
 </head>
-<body>
+<body class="internal-surface">
 <main>
   <header>
     <div>
@@ -425,6 +426,8 @@
       <h1>{{HEADING}}</h1>
       <div class="who" id="who"></div>
       <div class="side-links">
+        <a class="side-link" href="/ops">Open RescueOps</a>
+        <a class="side-link" href="/">Public website</a>
         <a class="side-link" href="{{FORM_URL}}">Open public form</a>
         <a class="side-link" href="{{SIDE_LINK_URL}}">Open foster placement &rarr;</a>
       </div>

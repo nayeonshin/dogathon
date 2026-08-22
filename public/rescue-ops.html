@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RescueOps - {{ORG}}</title>
+<link rel="stylesheet" href="/internal.css" />
+</head>
+<body>
+<div class="ops-layout">
+  <aside class="ops-sidebar">
+    <a class="ops-brand" href="/ops"><span class="ops-brand-mark">M</span><span>MNR<small>RescueOps</small></span></a>
+    <nav class="ops-nav" aria-label="Staff navigation">
+      <div class="ops-nav-label">Workspace</div>
+      <a href="/ops" aria-current="page"><span class="nav-glyph">O</span><span>Overview</span></a>
+      <a href="/adoption-intake"><span class="nav-glyph">A</span><span>Adoption intake</span></a>
+      <a href="/foster-intake"><span class="nav-glyph">F</span><span>Foster intake</span></a>
+      <a href="/foster"><span class="nav-glyph">P</span><span>Foster placement</span></a>
+      <div class="ops-nav-label">Shelter</div>
+      <a href="/"><span class="nav-glyph">W</span><span>Public website</span></a>
+    </nav>
+    <div class="ops-sidebar-foot"><b>Human approval is on</b><span>Outreach, calendar events, and placements wait for staff review.</span></div>
+  </aside>
+
+  <main class="ops-main">
+    <header class="ops-topbar">
+      <div><strong>Shared MNR operations</strong><p>Adoption and foster records in one workspace</p></div>
+      <div class="operator-chip"><span class="operator-dot"></span>Operator online</div>
+    </header>
+
+    <div class="ops-content">
+      <section class="ops-welcome">
+        <div><div class="ops-kicker">Saturday operations</div><h1>Good morning, team.</h1><p>Here is what needs a human decision today.</p></div>
+        <div class="review-pill" id="reviewPill">Loading review queue...</div>
+      </section>
+
+      <section class="urgent-card">
+        <div class="urgent-icon">!</div>
+        <div><div class="ops-kicker">Urgent foster request</div><h2>Luna needs a safe landing.</h2><p>Shortlist compatible fosters, review the explanation, then approve targeted outreach.</p></div>
+        <a class="ops-button green" href="/foster">Open placement</a>
+      </section>
+
+      <section class="metric-grid" id="metrics" aria-label="Operations summary"></section>
+
+      <div class="ops-columns">
+        <div>
+          <section class="ops-panel">
+            <header class="ops-panel-head"><div><h2>Dogs in shared care</h2><p>The same five records power every workflow.</p></div><a class="panel-link" href="/">Public view</a></header>
+            <div class="inventory" id="dogs"></div>
+          </section>
+
+          <section class="ops-panel">
+            <header class="ops-panel-head"><div><h2>Applications needing attention</h2><p>Raw answers stay intact until a coordinator reviews them.</p></div><a class="panel-link" href="/adoption-intake">Open intake</a></header>
+            <div class="work-list" id="applications"></div>
+          </section>
+        </div>
+
+        <aside>
+          <section class="ops-panel">
+            <header class="ops-panel-head"><div><h2>Action center</h2><p>Continue where the work happens.</p></div></header>
+            <div class="action-stack">
+              <a class="action-card" href="/adoption-intake"><span class="action-glyph">A</span><span><b>Triage adoption mail</b><span>Review genuine vs. spam</span></span><span class="action-arrow">&rsaquo;</span></a>
+              <a class="action-card" href="/foster-intake"><span class="action-glyph">F</span><span><b>Review foster profiles</b><span>Confirm capacity and restrictions</span></span><span class="action-arrow">&rsaquo;</span></a>
+              <a class="action-card" href="/foster"><span class="action-glyph">P</span><span><b>Approve Luna outreach</b><span>Preview emails before sending</span></span><span class="action-arrow">&rsaquo;</span></a>
+              <a class="action-card" href="/foster"><span class="action-glyph">C</span><span><b>Schedule handoff</b><span>Create approved calendar invites</span></span><span class="action-arrow">&rsaquo;</span></a>
+            </div>
+          </section>
+
+          <section class="ops-panel">
+            <header class="ops-panel-head"><div><h2>Recent activity</h2><p>Receipts from both sides.</p></div></header>
+            <div class="timeline" id="activity"></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const esc=(value='')=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const label=value=>String(value).replaceAll('_',' ');
+const byId=(items,id)=>items.find(item=>item.id===id);
+const formatTime=value=>new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
+
+function render(state){
+  const urgent=state.dogs.filter(dog=>dog.status==='foster_needed').length;
+  const fosterReviews=state.fosterProfileReviews.filter(review=>review.status==='needs_review').length;
+  const pending=state.adoptionApplications.length+fosterReviews;
+  document.querySelector('#reviewPill').textContent=`${pending} item${pending===1?'':'s'} waiting for review`;
+  document.querySelector('#metrics').innerHTML=[
+    ['Dogs in care',state.dogs.length,'Shared inventory'],
+    ['Urgent foster',urgent,'Luna is the priority'],
+    ['Adoption records',state.adoptionApplications.length,'Intake connected'],
+    ['Foster reviews',fosterReviews,'Staff confirmation needed']
+  ].map(([name,value,note])=>`<article class="ops-metric"><span>${esc(name)}</span><b>${value}</b><em>${esc(note)}</em></article>`).join('');
+
+  document.querySelector('#dogs').innerHTML=state.dogs.map(dog=>`<article class="inventory-dog"><div class="dog-avatar">${dog.photoUrl?`<img src="${esc(dog.photoUrl)}" alt="${esc(dog.name)}, ${esc(dog.breed)}" loading="lazy">`:esc(dog.name[0])}</div><h3>${esc(dog.name)}</h3><p>${esc(dog.breed)}<br>${esc(dog.age)}</p><span class="mini-status ${esc(dog.status)}">${esc(label(dog.status))}</span></article>`).join('');
+
+  const adoptionRows=[...state.adoptionApplications].reverse().map(application=>{
+    const person=byId(state.people,application.personId),dog=byId(state.dogs,application.dogId);
+    return `<article class="work-row"><div><b>${esc(person?.name||'Applicant')} applied for ${esc(dog?.name||application.dogLabel)}</b><p>Adoption intake / ${esc(application.housing||'housing not answered')} / human triage next</p></div><span class="work-status">${esc(label(application.status))}</span></article>`;
+  });
+  const fosterRows=[...state.fosterApplications].reverse().map(application=>{
+    const person=byId(state.people,application.personId),dog=byId(state.dogs,application.preferredDogId);
+    const review=state.fosterProfileReviews.find(item=>item.applicationId===application.id);
+    return `<article class="work-row"><div><b>${esc(person?.name||'Applicant')} offered to foster ${esc(dog?.name||application.preferredDogLabel)}</b><p>Capacity, preferences, and restrictions require staff confirmation</p></div><span class="work-status">${esc(label(review?.status||application.status))}</span></article>`;
+  });
+  const rows=[...adoptionRows,...fosterRows].slice(0,6);
+  document.querySelector('#applications').innerHTML=rows.join('')||'<div class="empty-state">No local applications yet. Use the public forms or demo-email controls to add one.</div>';
+
+  document.querySelector('#activity').innerHTML=[...state.activity].reverse().slice(0,6).map(event=>`<article class="timeline-event"><b>${esc(event.summary)}</b><small>${esc(label(event.type))} / ${formatTime(event.at)}</small></article>`).join('')||'<div class="empty-state">New applications and staff actions will appear here.</div>';
+}
+
+async function load(){
+  const response=await fetch('/api/rescue-ops/state');
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||'Could not load RescueOps');
+  render(data.state);
+}
+load().catch(error=>{document.querySelector('#applications').innerHTML=`<div class="empty-state">${esc(error.message)}</div>`});
+setInterval(load,5000);
+</script>
+</body>
+</html>

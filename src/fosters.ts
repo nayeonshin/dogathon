@@ -196,7 +196,7 @@ export const FOSTER_SAMPLES: FosterSample[] = [
     email: "rita.alvarez@example.com",
     phone: "(510) 555-0377",
     city: "Berkeley",
-    dog: "Waffles",
+    dog: "Biscuit",
     available_from: "2026-09-01",
     available_until: "2026-09-30",
     experience: "First time",
@@ -216,7 +216,7 @@ export const FOSTER_SAMPLES: FosterSample[] = [
     email: "noah.greer@example.com",
     phone: "(415) 555-0448",
     city: "San Francisco",
-    dog: "Olive",
+    dog: "Marigold",
     available_from: "2026-08-24",
     available_until: "2026-11-24",
     experience: "Have fostered before",
@@ -228,7 +228,7 @@ export const FOSTER_SAMPLES: FosterSample[] = [
     meds: "Yes, pills and drops are fine",
     transport: "Yes, I can drive to vet appointments",
     message:
-      "Olive is a couch with opinions, and so am I. Happy to take a senior for a few " +
+      "Marigold is a sunbeam locator, and so am I. Happy to take a senior for a few " +
       "months. Weekends only for the visit.",
   },
   {
@@ -276,7 +276,7 @@ export const FOSTER_SAMPLES: FosterSample[] = [
     email: "claire.dubois@example.com",
     phone: "(415) 555-0619",
     city: "San Francisco",
-    dog: "Waffles",
+    dog: "Luna",
     available_from: "2026-08-28",
     available_until: "2026-09-11",
     experience: "Have fostered before",
@@ -288,7 +288,7 @@ export const FOSTER_SAMPLES: FosterSample[] = [
     meds: "Yes, pills and drops are fine",
     transport: "Yes, I can drive to vet appointments",
     message:
-      "Waffles has never met a stranger and neither have my cats, apparently. I can " +
+      "Luna sounds thoughtful and my cats are dog-savvy, apparently. I can " +
       "take him for two weeks. Named day: next Friday after 10am.",
   },
 ];
@@ -313,7 +313,7 @@ export const FOSTER_SPAM: FosterSample[] = [
     name: "Bradley Vance",
     email: "b.vance@apexyieldcapital.test",
     phone: "(212) 555-0100",
-    dog: "Olive",
+    dog: "Marigold",
     message:
       "Quick question — is your organization holding any treasury in stablecoins yet? " +
       "We're onboarding a small number of 501(c)(3)s into a tokenized yield product " +
@@ -323,7 +323,7 @@ export const FOSTER_SPAM: FosterSample[] = [
     name: "PawsomeSupply Wholesale",
     email: "accounts@pawsomesupply.test",
     phone: "(888) 555-0143",
-    dog: "Waffles",
+    dog: "Biscuit",
     message:
       "We manufacture kennels and bulk kibble for shelters. Rescue partners get 40% " +
       "off at MOQ 500. Who handles procurement for your foster network?",
