@@ -37,6 +37,7 @@ import { completeGatewayAuth } from "./oauth.js";
 import { triage, type TriageEvent } from "./triage.js";
 import { formToEmail, GENUINE_SAMPLES, SPAM_SAMPLES } from "./applications.js";
 import { DOGS, ORG } from "./dogs.js";
+import { createPlatformHttpApp } from "./platform/http.js";
 
 type Feed =
   | { type: "log"; level: "info" | "warn" | "error"; text: string }
@@ -64,6 +65,11 @@ const page = (file: string) =>
   readFileSync(join(process.cwd(), "public", file), "utf8").replaceAll("{{ORG}}", ORG);
 
 app.get("/", (c) => c.html(page("index.html")));
+
+app.get("/platform", (c) => c.html(page("platform.html")));
+app.get("/platform.css", (c) => c.body(page("platform.css"), 200, { "content-type": "text/css; charset=utf-8" }));
+app.get("/platform.js", (c) => c.body(page("platform.js"), 200, { "content-type": "text/javascript; charset=utf-8" }));
+app.route("/api/platform", createPlatformHttpApp());
 
 app.get("/api/state", async (c) => {
   const providers = await providerState();

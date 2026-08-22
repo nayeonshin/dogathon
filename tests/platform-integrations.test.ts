@@ -9,6 +9,11 @@ import {
   type ToolInvoker,
 } from "../src/platform/integrations/index.js";
 import { InMemoryReminderStore, ReminderService } from "../src/platform/reminders.js";
+import { PlatformActionExecutorAdapter } from "../src/platform/integrations/platform-adapter.js";
+import type {
+  Approval as PlatformApproval,
+  ProposedAction as PlatformProposedAction,
+} from "../src/platform/types.js";
 
 class FakeInvoker implements ToolInvoker {
   calls: Array<{ toolName: string; input: Record<string, unknown>; context: ToolInvocationContext }> = [];
@@ -39,6 +44,53 @@ const approvalFor = (action: ProposedAction): HumanApproval => ({
   status: "approved",
   decidedBy: "staff:jill",
   decidedAt: "2026-08-22T21:01:00.000Z",
+});
+
+test("persistent platform actions bridge into the provider-neutral executor", async () => {
+  const invoker = new FakeInvoker();
+  const executor = new ActionExecutor({ invoker, tools: { "gmail.draft": "Gmail_WriteDraftReplyEmail" } });
+  const adapter = new PlatformActionExecutorAdapter("gmail", executor);
+  const platformAction: PlatformProposedAction = {
+    id: "platform-action-1",
+    organizationId: "rescue-a",
+    caseId: "case-1",
+    kind: "email.draft",
+    provider: "gmail",
+    target: { email: "foster@example.test" },
+    payload: { subject: "Can Luna visit today?" },
+    reason: "Coordinator approved targeted outreach",
+    evidence: [{ label: "availability", source: "coordinator review" }],
+    consequence: "consequential",
+    requiresApproval: true,
+    idempotencyKey: "case-1:gmail-draft:1",
+    status: "approved",
+    latestApprovalId: "approval-1",
+    source: { system: "rescueops" },
+    createdAt: "2026-08-22T21:00:00.000Z",
+    updatedAt: "2026-08-22T21:01:00.000Z",
+  };
+  const platformApproval: PlatformApproval = {
+    id: "approval-1",
+    organizationId: "rescue-a",
+    caseId: "case-1",
+    actionId: platformAction.id,
+    decision: "approved",
+    decidedByMembershipId: "member-jill",
+    decidedByDisplayName: "Jill Coordinator",
+    decidedAt: "2026-08-22T21:01:00.000Z",
+    source: { system: "rescueops" },
+    createdAt: "2026-08-22T21:00:30.000Z",
+    updatedAt: "2026-08-22T21:01:00.000Z",
+  };
+
+  const result = await adapter.execute(platformAction, {
+    actor: { organizationId: "rescue-a", membershipId: "member-jill", displayName: "Jill Coordinator" },
+    approval: platformApproval,
+  });
+  assert.equal(result.status, "succeeded");
+  assert.equal(invoker.calls.length, 1);
+  assert.equal(invoker.calls[0].toolName, "Gmail_WriteDraftReplyEmail");
+  assert.equal(invoker.calls[0].context.idempotencyKey, platformAction.idempotencyKey);
 });
 
 test("consequential actions fail closed without named matching approval", async () => {

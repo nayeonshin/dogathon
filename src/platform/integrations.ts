@@ -1,4 +1,4 @@
-import type { ProposedAction, ReceiptStatus, RecordId } from "./types.js";
+import type { Approval, PlatformActor, ProposedAction, ReceiptStatus, RecordId } from "./types.js";
 
 export interface ProviderExecutionResult {
   status: ReceiptStatus;
@@ -13,7 +13,10 @@ export interface ProviderExecutionResult {
  */
 export interface ActionProviderAdapter {
   readonly provider: string;
-  execute(action: ProposedAction): Promise<ProviderExecutionResult>;
+  execute(
+    action: ProposedAction,
+    context: { actor: PlatformActor; approval?: Approval },
+  ): Promise<ProviderExecutionResult>;
 }
 
 export interface ShelterRecordAdapter {

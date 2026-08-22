@@ -431,7 +431,10 @@ export class RescueOpsPlatformService {
       return { ...current, status: "executing", updatedAt: now };
     });
     try {
-      const result = await adapter.execute(executing);
+      const approval = executing.latestApprovalId
+        ? await this.store.get("approvals", executing.latestApprovalId, actor.organizationId)
+        : undefined;
+      const result = await adapter.execute(executing, { actor, approval });
       return this.recordReceipt(actor, {
         actionId,
         status: result.status,

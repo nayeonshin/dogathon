@@ -6,7 +6,10 @@
     "seed": "tsx src/seed.ts",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "reset": "tsx src/reset.ts"
+    "reset": "tsx src/reset.ts",
+    "platform:demo": "tsx src/platform-demo-server.ts",
+    "typecheck": "tsc --noEmit",
+    "test:platform": "tsx --test tests/platform-core.test.ts tests/platform-integrations.test.ts tests/platform-http.test.ts tests/platform-ui.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.40",
