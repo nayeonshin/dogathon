@@ -90,7 +90,9 @@ To demo the upstream roster intake first, open
 **http://localhost:4111/foster-intake** for the operator console and
 **http://localhost:4111/foster-apply** for the public foster-home application.
 This remains a mailbox-driven agent workflow parallel to adoption intake while
-sharing one server and one provider connection.
+sharing one server and one provider connection. From the foster intake console,
+**Call Slack bot** (or type `apply-foster` in `#submit-foster-applications`)
+asks the same questions in Slack, then emails intake so the agent can file it.
 
 Open **http://localhost:4111/foster** and follow the numbered workflow:
 
@@ -133,7 +135,7 @@ would pass them.
 | File | Job |
 | --- | --- |
 | `src/server.ts` | Hono server, the 10-second poll loop, SSE feed to the browser |
-| `src/arcade.ts` | Arcade SDK: pre-auth, the Gmail poll, the demo emails. **No agent logic.** |
+| `src/arcade.ts` | Arcade SDK: pre-auth, the Gmail poll, the demo emails, Slack bot plumbing. **No agent logic.** |
 | `src/gateway.ts` | The MCP gateway connection and its token store |
 | `src/oauth.ts` | The gateway's OAuth flow, driven by hand — see below |
 | `src/triage.ts` | The agent. A Mastra `Agent` whose tools all come from MCP. |
@@ -141,6 +143,7 @@ would pass them.
 | `src/dogs.ts` | The roster, and `ORG` — rename the whole thing from one line |
 | `src/fosters.ts` | Foster-home application samples and form-to-email composer |
 | `src/foster-triage.ts` | Foster-home intake agent for Sheet, Slack, Calendar, and draft reply |
+| `src/slack-bot.ts` | Slack foster bot: `apply-foster` Q&A in `#submit-foster-applications` |
 | `src/foster.ts` | Seeded state, deterministic foster rules, transitions, and receipts |
 | `src/foster-agent.ts` | Model-assisted message drafts with deterministic fallbacks |
 | `public/apply.html` | The public adoption form |

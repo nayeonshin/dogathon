@@ -1,7 +1,8 @@
 /** Arcade SDK = plumbing only.
  *
- *  Three jobs, none of them agentic: pre-authorize the providers, poll Gmail, and
- *  send the demo emails. Every tool call the AGENT makes goes through the MCP
+ *  Jobs, none of them agentic: pre-authorize the providers, poll Gmail, send
+ *  the demo emails, and drive the Slack foster bot (read channel / thread,
+ *  post questions). Every tool call the AGENT makes goes through the MCP
  *  gateway (gateway.ts), which never sees the API key or the user id.
  */
 import Arcade from "@arcadeai/arcadejs";
@@ -215,4 +216,121 @@ function fosterDemoAlias(fosterId: string) {
   const [local, domain] = ARCADE_USER_ID.split("@");
   if (!domain) return ARCADE_USER_ID;
   return `${local}+dogathon-${fosterId}@${domain}`;
+}
+
+export type SlackMessage = { ts: string; text: string; user: string };
+
+/** Where to read/write. Channel by name, or a conversation id. */
+export type SlackTarget =
+  | { channel_name: string }
+  | { conversation_id: string };
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+}
+
+/** Slack message timestamps look like "1712345678.123456". */
+function isTs(v: unknown): v is string {
+  return typeof v === "string" && /^\d+\.\d+$/.test(v);
+}
+
+function extractTs(value: unknown, depth = 0): string {
+  if (depth > 5 || value == null) return "";
+  if (isTs(value)) return value;
+  const rec = asRecord(value);
+  if (!rec) return "";
+  for (const k of ["ts", "message_ts", "timestamp"]) {
+    if (isTs(rec[k])) return rec[k] as string;
+  }
+  for (const child of Object.values(rec)) {
+    const hit = extractTs(child, depth + 1);
+    if (hit) return hit;
+  }
+  return "";
+}
+
+/** C-channel, G-private/group, D-direct message. */
+function isSlackId(v: unknown): v is string {
+  return typeof v === "string" && /^[CDG][A-Z0-9]+$/i.test(v);
+}
+
+function extractConversationId(value: unknown, depth = 0): string {
+  if (depth > 5 || value == null) return "";
+  const rec = asRecord(value);
+  if (!rec) return "";
+  for (const k of ["conversation_id", "channel_id", "channel"]) {
+    if (isSlackId(rec[k])) return rec[k] as string;
+  }
+  for (const child of Object.values(rec)) {
+    const hit = extractConversationId(child, depth + 1);
+    if (hit) return hit;
+  }
+  return "";
+}
+
+function parseSlackMessages(value: unknown): SlackMessage[] {
+  const rec = asRecord(value);
+  const raw = Array.isArray(value)
+    ? value
+    : rec
+      ? (rec.messages ?? rec.items ?? rec.thread_messages ?? [])
+      : [];
+  if (!Array.isArray(raw)) return [];
+  return (raw as unknown[])
+    .map((item) => {
+      const m = asRecord(item) ?? {};
+      const ts = extractTs(m);
+      const text = String(m.text ?? m.message ?? m.body ?? "").trim();
+      const user = String(m.user_name ?? m.username ?? m.user_real_name ?? m.user ?? "");
+      return { ts, text, user };
+    })
+    .filter((m) => m.ts);
+}
+
+function slackOut(result: { success?: boolean; output?: { value?: unknown; error?: unknown } }, what: string) {
+  if (!result.success) throw new Error(`${what}: ${JSON.stringify(result.output?.error)}`);
+  return result.output?.value;
+}
+
+function targetInput(target: SlackTarget): Record<string, unknown> {
+  if ("channel_name" in target) return { channel_name: target.channel_name.replace(/^#/, "") };
+  return { conversation_id: target.conversation_id };
+}
+
+export async function getSlackMessages(target: SlackTarget, limit = 15): Promise<SlackMessage[]> {
+  const result = await arcade.tools.execute({
+    tool_name: "Slack_GetMessages",
+    input: { ...targetInput(target), limit },
+    user_id: ARCADE_USER_ID,
+  });
+  return parseSlackMessages(slackOut(result, "Slack read failed"));
+}
+
+export async function getSlackThread(
+  target: SlackTarget,
+  threadTs: string,
+  limit = 50,
+): Promise<SlackMessage[]> {
+  const result = await arcade.tools.execute({
+    tool_name: "Slack_GetThreadMessages",
+    input: { ...targetInput(target), thread_ts: threadTs, limit },
+    user_id: ARCADE_USER_ID,
+  });
+  return parseSlackMessages(slackOut(result, "Slack thread read failed"));
+}
+
+export async function postSlackMessage(
+  target: SlackTarget,
+  message: string,
+  threadTs?: string,
+): Promise<{ ts: string; conversation_id: string }> {
+  const input: Record<string, unknown> = { ...targetInput(target), message };
+  if (threadTs) input.thread_ts = threadTs;
+  const result = await arcade.tools.execute({
+    tool_name: "Slack_SendMessage",
+    input,
+    user_id: ARCADE_USER_ID,
+  });
+  const value = slackOut(result, "Slack send failed");
+  return { ts: extractTs(value), conversation_id: extractConversationId(value) };
 }

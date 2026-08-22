@@ -283,6 +283,7 @@
 
   .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 34px; }
   .hint { font: 400 13px/1.4 var(--mono); color: var(--dimmer); margin-left: 6px; }
+  .hint:empty { display: none; }
 
   /* ── gateway step ─────────────────────────────────────────────────────── */
 
@@ -474,8 +475,11 @@
   <section id="phase-ready" hidden>
     <div class="actions">
       <button id="send">{{SEND_LABEL}}</button>
-      <button id="spam" class="amber">Send form spam</button>
-      <span class="hint">&larr; the agent should refuse this one</span>
+      <span class="hint">{{SEND_HINT}}</span>
+      <button id="bot" class="ghost" {{BOT_ATTR}}>Call Slack bot</button>
+      <span class="hint">{{BOT_HINT}}</span>
+      <button id="spam" class="amber">{{SPAM_LABEL}}</button>
+      <span class="hint">{{SPAM_HINT}}</span>
     </div>
   </section>
 
@@ -663,6 +667,13 @@ async function send(kind, i) {
 $("send").addEventListener("click", async (e) => {
   e.target.disabled = true;
   await send("application", iApp++);
+  setTimeout(() => { e.target.disabled = false; }, 2000);
+});
+
+$("bot").addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  const r = await fetch(`${API}/slack-bot`, { method: "POST" }).then((x) => x.json());
+  if (!r.ok) text("err", "!", r.error ?? "Could not start Slack bot");
   setTimeout(() => { e.target.disabled = false; }, 2000);
 });
 

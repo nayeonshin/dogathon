@@ -9,7 +9,7 @@ one Arcade/Gmail/Calendar connection:
 | --- | --- |
 | `/` | Adoption intake operator console |
 | `/apply` | Public adoption application |
-| `/foster-intake` | Foster-home intake operator console |
+| `/foster-intake` | Foster-home intake operator console (form samples + Call Slack bot) |
 | `/foster-apply` | Public foster-home application |
 | `/foster` | Staff foster-placement dashboard |
 | `/foster/respond/:token` | Foster-facing response page |
