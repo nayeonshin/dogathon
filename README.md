@@ -14,8 +14,9 @@ The same server also includes a resettable **Foster Placement** thin slice at
 fresh foster availability through placement closure without changing the
 existing adoption intake demo.
 
-A companion **Foster Application Intake** runs at **http://localhost:4112**.
-Its public form at **http://localhost:4112/apply** feeds Gmail, then a dedicated
+A companion **Foster Application Intake** runs at
+**http://localhost:4111/foster-intake**. Its public form at
+**http://localhost:4111/foster-apply** feeds Gmail, then a dedicated
 foster-intake agent records qualified homes in the foster roster, alerts Slack,
 books a home visit, and drafts a reply. Together the demos cover intake first,
 then trustworthy placement coordination.
@@ -73,10 +74,11 @@ email and stops. It does not call the agent.
 
 ### Foster placement demo
 
-To demo the upstream roster intake first, open **http://localhost:4112** for the
-operator console and **http://localhost:4112/apply** for the public foster-home
-application. This remains a mailbox-driven agent workflow parallel to adoption
-intake.
+To demo the upstream roster intake first, open
+**http://localhost:4111/foster-intake** for the operator console and
+**http://localhost:4111/foster-apply** for the public foster-home application.
+This remains a mailbox-driven agent workflow parallel to adoption intake while
+sharing one server and one provider connection.
 
 Open **http://localhost:4111/foster** and follow the numbered workflow:
 
@@ -132,7 +134,7 @@ would pass them.
 | `public/apply.html` | The public adoption form |
 | `public/index.html` | The operator console |
 | `public/foster.html` | Staff foster-placement dashboard |
-| `public/foster-apply.html` | Public foster-home application form on port 4112 |
+| `public/foster-apply.html` | Public foster-home application form |
 | `public/foster-response.html` | Mobile foster response page |
 
 The split between `arcade.ts` and everything else is the point. The Arcade API key

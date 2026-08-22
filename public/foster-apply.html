@@ -339,12 +339,15 @@ form.addEventListener("submit", async (e) => {
   note.textContent = "Sending…";
 
   try {
-    const r = await fetch("/apply", {
+    const response = await fetch("/foster-apply", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(data),
-    }).then((x) => x.json());
-    if (!r.ok) throw new Error(r.error ?? "Submission failed");
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.ok) {
+      throw new Error(result?.error ?? `Submission failed (${response.status})`);
+    }
 
     $("who-dog").textContent = data.dog && data.dog !== "Any" ? data.dog : "a dog in your care";
     $("pane-form").hidden = true;
