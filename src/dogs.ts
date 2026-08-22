@@ -16,7 +16,7 @@ export const DOGS = [
  *  Everything user-visible derives from this: the console, the public form, the
  *  agent's persona, the Sheet title, the OAuth consent screen. Renaming the
  *  operation should be a one-line change, not a grep. */
-export const ORG = "Mateo's Dog System";
+export const ORG = "MNR's Dog System";
 
 /** NOTE: this is matched against the live Sheet by title. Change ORG and the
  *  agent will look for a Sheet that does not exist yet — re-run `npm run seed`. */
