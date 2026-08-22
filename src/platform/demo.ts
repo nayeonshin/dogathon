@@ -2,6 +2,8 @@ import type { PlatformActor } from "./types.js";
 import { NotFoundError } from "./errors.js";
 import { RescueOpsPlatformService } from "./service.js";
 import { JsonPlatformStore } from "./store.js";
+import { ActionExecutor } from "./integrations/action-executor.js";
+import { PlatformActionExecutorAdapter } from "./integrations/platform-adapter.js";
 
 export const DEMO_ORGANIZATIONS = {
   harbor: {
@@ -33,18 +35,17 @@ export async function createDemoPlatform(filePath: string): Promise<DemoPlatform
   await store.initialize();
   const service = new RescueOpsPlatformService(store);
 
-  for (const provider of ["gmail", "calendar", "sheets", "slack", "shelterluv"]) {
-    service.integrations.register({
-      provider,
-      async execute(action) {
-        return {
-          status: "simulated",
-          externalId: `sim-${action.id}`,
-          message: `Demo receipt only; no live ${provider} action was executed.`,
-          details: { provider, mode: "synthetic-demo" },
-        };
+  const executor = new ActionExecutor({
+    invoker: {
+      async invoke() {
+        throw new Error("Synthetic demo executor must never invoke a live provider");
       },
-    });
+    },
+    tools: {},
+    simulationMode: true,
+  });
+  for (const provider of ["gmail", "calendar", "sheets", "slack", "shelterluv"]) {
+    service.integrations.register(new PlatformActionExecutorAdapter(provider, executor));
   }
 
   const actors: Record<DemoOrganizationKey, PlatformActor> = {
@@ -215,6 +216,27 @@ async function seedDemo(
     source: { system: "google-form", importedAt: now },
   });
   await service.transitionCase(actors.mission, missionCase.id, "needs_information");
+
+  const maple = await service.createAnimal(actors.mission, {
+    name: "Maple",
+    species: "dog",
+    status: "active",
+    source: { system: "public-application", importedAt: now },
+  });
+  const priya = await service.createPerson(actors.mission, {
+    displayName: "Priya Shah",
+    status: "active",
+    roles: ["adoption-applicant"],
+    source: { system: "public-application", importedAt: now },
+  });
+  const missionAdoption = await service.createCase(actors.mission, {
+    workflowType: "adoption",
+    title: "Priya Shah + Maple",
+    animalIds: [maple.id],
+    personIds: [priya.id],
+    source: { system: "public-application", importedAt: now },
+  });
+  await service.transitionCase(actors.mission, missionAdoption.id, "reviewing");
 
   const request = await service.publishNetworkRequest(actors.harbor, {
     caseId: fosterCase.id,

@@ -43,6 +43,18 @@ model given eight.
 
 ## Running it
 
+### Shared RescueOps platform — no credentials required
+
+To run the new synthetic, multi-organization adoption/foster platform without making any live provider calls:
+
+```bash
+npm run platform:demo
+```
+
+Open **http://localhost:4222/platform**. Approvals, simulated receipts, reminders, and the limited-field rescue-to-rescue handoff persist to a local ignored JSON file. The page explicitly labels its synthetic data, simulated integrations, and lack of production tenant security. See `docs/SHARED-PLATFORM-DEMO.md` for the five-minute flow and boundaries.
+
+### Existing ambient adoption intake
+
 Open **http://localhost:4111**. The UI reveals itself in three steps, because
 each one has to succeed before the next makes sense:
 

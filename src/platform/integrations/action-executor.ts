@@ -28,6 +28,8 @@ export class InMemoryReceiptStore implements ReceiptStore {
 export type ActionExecutorOptions = {
   invoker: ToolInvoker;
   tools: IntegrationToolNames;
+  /** Produce typed simulated receipts without invoking a provider. */
+  simulationMode?: boolean;
   inputMappers?: Partial<Record<ProposedAction["kind"], (
     input: Record<string, unknown>,
     action: ProposedAction,
@@ -76,6 +78,20 @@ export class ActionExecutor {
       return this.store(action, attemptedAt, {
         ok: false,
         error: approvalError,
+        providerDispatched: false,
+      });
+    }
+
+    if (this.options.simulationMode) {
+      return this.store(action, attemptedAt, {
+        ok: true,
+        simulated: true,
+        output: {
+          mode: "synthetic-demo",
+          message: `No live provider call was made for ${action.kind}.`,
+          input: action.input,
+        },
+        approvedBy: approval?.decidedBy,
         providerDispatched: false,
       });
     }

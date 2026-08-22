@@ -37,6 +37,10 @@ test("shared platform surface states its safety and privacy boundaries", async (
   assert.match(script, /idempotency key/i);
   assert.match(script, /No duplicate was created/i);
   assert.doesNotMatch(html, /chat/i, "operator surface must not be framed as chat");
+  assert.doesNotMatch(html, /Gmail <span>connected|Calendar <span>connected|Sheets <span>connected/);
+  assert.match(script, /fetch\(`\/api\/platform\/snapshot/);
+  assert.match(script, /fetch\(`\/api\/platform\/actions/);
+  assert.match(script, /fetch\(`\/api\/platform\/network\/demo-handoff/);
 });
 
 test("surface uses semantic, keyboard-friendly controls and local assets", async () => {

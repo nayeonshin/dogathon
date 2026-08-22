@@ -93,6 +93,20 @@ test("persistent platform actions bridge into the provider-neutral executor", as
   assert.equal(invoker.calls[0].context.idempotencyKey, platformAction.idempotencyKey);
 });
 
+test("simulation mode never calls a configured or live provider", async () => {
+  const invoker = new FakeInvoker();
+  const executor = new ActionExecutor({
+    invoker,
+    tools: { "gmail.send": "Gmail_SendEmail" },
+    simulationMode: true,
+  });
+  const action = baseAction();
+  const receipt = await executor.execute(action, approvalFor(action));
+  assert.equal(receipt.status, "simulated");
+  assert.equal(receipt.providerDispatched, false);
+  assert.equal(invoker.calls.length, 0);
+});
+
 test("consequential actions fail closed without named matching approval", async () => {
   const invoker = new FakeInvoker();
   const executor = new ActionExecutor({

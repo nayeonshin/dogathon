@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   ApprovalRequiredError,
+  ConflictError,
   IntegrationRegistry,
   JsonPlatformStore,
   NotFoundError,
@@ -136,6 +137,10 @@ test("actions are idempotent, require named approval, dispatch once, and retain 
     const repeatedDispatch = await context.service.dispatchApprovedAction(rescue.actor, proposed.record.id);
     assert.equal(repeatedDispatch.id, receipt.id);
     assert.equal(executions, 1);
+    await assert.rejects(
+      context.service.requestApproval(rescue.actor, proposed.record.id),
+      ConflictError,
+    );
 
     const reminder = await context.service.scheduleReminder(rescue.actor, {
       caseId: workflowCase.id,

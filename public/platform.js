@@ -169,6 +169,155 @@ let activeWorkflow = "adoption";
 let activeCaseId = organizations.harbor.cases.adoption[0].id;
 const actionStates = new Map();
 let toastTimer;
+let backendConnected = false;
+
+async function syncOrganizationFromApi(organizationKey) {
+  const response = await fetch(`/api/platform/snapshot?organizationId=${encodeURIComponent(organizationKey)}`);
+  if (!response.ok) throw new Error(`Platform snapshot failed (${response.status})`);
+  const snapshot = await response.json();
+  const animalById = new Map(snapshot.animals.map((animal) => [animal.id, animal]));
+  const personById = new Map(snapshot.people.map((person) => [person.id, person]));
+  const actionsByCase = groupBy(snapshot.actions, "caseId");
+  const remindersByCase = groupBy(snapshot.reminders, "caseId");
+  const receiptsByCase = groupBy(snapshot.receipts, "caseId");
+  const eventsByCase = groupBy(snapshot.events, "caseId");
+
+  for (const key of [...actionStates.keys()]) {
+    if (key.startsWith(`${organizationKey}:`)) actionStates.delete(key);
+  }
+  for (const action of snapshot.actions) {
+    if (["approved", "executing", "completed", "uncertain", "failed"].includes(action.status)) {
+      actionStates.set(`${organizationKey}:${action.id}`, "approved");
+    }
+    if (action.status === "rejected" || action.status === "cancelled") {
+      actionStates.set(`${organizationKey}:${action.id}`, "rejected");
+    }
+  }
+
+  const mappedCases = { adoption: [], foster: [] };
+  for (const workflowCase of snapshot.cases) {
+    if (!Object.hasOwn(mappedCases, workflowCase.workflowType)) continue;
+    const animals = workflowCase.animalIds.map((id) => animalById.get(id)).filter(Boolean);
+    const people = workflowCase.personIds.map((id) => personById.get(id)).filter(Boolean);
+    const caseActions = actionsByCase.get(workflowCase.id) || [];
+    const caseReceipts = receiptsByCase.get(workflowCase.id) || [];
+    const sourceAge = workflowCase.source.importedAt ? relativeTime(workflowCase.source.importedAt) : "recorded locally";
+    const stale = workflowCase.data?.sourceFreshness === "stale";
+    mappedCases[workflowCase.workflowType].push({
+      id: workflowCase.id,
+      title: workflowCase.title,
+      subtitle: workflowCase.workflowType === "foster"
+        ? "Urgent foster coordination with approval-gated outreach and handoff actions."
+        : "Application intake is ready for a named staff decision; no final adoption decision is automated.",
+      status: titleCase(workflowCase.status),
+      priority: workflowCase.priority,
+      updated: relativeTime(workflowCase.updatedAt),
+      animal: animals.map((animal) => animal.name).join(", ") || "Unassigned",
+      person: people.map((person) => person.displayName).join(", ") || "Unassigned",
+      source: titleCase(workflowCase.source.system),
+      freshness: `${stale ? "Stale" : "Fresh"}|${sourceAge}`,
+      owner: snapshot.organization.actorName,
+      actions: caseActions.map((action) => ({
+        id: action.id,
+        backendAction: true,
+        icon: actionIcon(action.kind),
+        title: actionTitle(action.kind),
+        detail: action.reason,
+        evidence: `${action.evidence.map((item) => `${item.label}: ${item.source}`).join(" · ") || "Coordinator evidence attached"} · idempotency key ${action.idempotencyKey}`,
+      })),
+      reminders: (remindersByCase.get(workflowCase.id) || [])
+        .filter((reminder) => !["completed", "cancelled"].includes(reminder.status))
+        .map((reminder) => ({
+          id: reminder.id,
+          when: relativeDue(reminder.dueAt),
+          title: titleCase(reminder.type),
+          detail: `${reminder.message} · ${titleCase(reminder.status)}`,
+        })),
+      receipts: caseReceipts.map((receipt) => ({
+        kind: receipt.status === "succeeded" ? "success" : receipt.status,
+        title: `${titleCase(receipt.provider)} action receipt`,
+        detail: `${receipt.message || "Outcome recorded"} · ${receipt.id}`,
+        status: receipt.status,
+      })),
+      events: (eventsByCase.get(workflowCase.id) || [])
+        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+        .map((event) => ({
+          title: titleCase(event.type),
+          detail: event.summary,
+          time: relativeTime(event.occurredAt),
+        })),
+    });
+  }
+
+  const prior = organizations[organizationKey];
+  organizations[organizationKey] = {
+    name: snapshot.organization.name,
+    initials: prior.initials,
+    user: snapshot.organization.actorName,
+    cases: mappedCases,
+    network: {
+      requests: snapshot.networkRequests,
+      publishedRequests: snapshot.publishedRequests || [],
+      offers: snapshot.capacityOffers,
+      incomingOffers: snapshot.incomingCapacityOffers || [],
+      grants: snapshot.shareGrants,
+      handoffs: snapshot.handoffs,
+    },
+  };
+  backendConnected = true;
+}
+
+function groupBy(items, field) {
+  const grouped = new Map();
+  for (const item of items) {
+    const bucket = grouped.get(item[field]) || [];
+    bucket.push(item);
+    grouped.set(item[field], bucket);
+  }
+  return grouped;
+}
+
+function titleCase(value) {
+  return String(value).replaceAll("_", " ").replaceAll(".", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function relativeTime(value) {
+  const milliseconds = Date.now() - Date.parse(value);
+  const minutes = Math.max(0, Math.round(milliseconds / 60_000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
+}
+
+function relativeDue(value) {
+  const minutes = Math.round((Date.parse(value) - Date.now()) / 60_000);
+  if (minutes <= 0) return "Due";
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.round(minutes / 60)}h`;
+}
+
+function actionIcon(kind) {
+  if (kind.startsWith("email")) return "G";
+  if (kind.startsWith("calendar")) return "C";
+  if (kind.startsWith("sheet")) return "S";
+  return "!";
+}
+
+function actionTitle(kind) {
+  const labels = {
+    "email.draft": "Draft targeted foster outreach",
+    "email.send": "Send approved outreach",
+    "calendar.create": "Propose handoff calendar invitation",
+    "calendar.update": "Update approved calendar invitation",
+    "calendar.cancel": "Cancel approved calendar invitation",
+    "sheet.append": "Add applicant to the shared pipeline",
+    "sheet.update": "Update the shared pipeline",
+    "staff.notify": "Notify assigned staff",
+    "shelter_record.prepare_update": "Prepare Shelterluv reconciliation packet",
+  };
+  return labels[kind] || titleCase(kind);
+}
 
 function currentOrganization() { return organizations[activeOrg]; }
 function visibleCases() { return currentOrganization().cases[activeWorkflow]; }
@@ -186,14 +335,14 @@ function showToast(message) {
   toastTimer = setTimeout(() => { toast.hidden = true; }, 3200);
 }
 
-function titleCase(value) { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-
 function renderOrganization() {
   const org = currentOrganization();
   $("#org-name").textContent = org.name;
   $("#org-avatar").textContent = org.initials;
   $("#privacy-org").textContent = org.name;
   $("#case-count").textContent = String(org.cases.adoption.length + org.cases.foster.length);
+  $("[data-workflow=adoption] b").textContent = String(org.cases.adoption.length);
+  $("[data-workflow=foster] b").textContent = String(org.cases.foster.length);
   $("#organization").value = activeOrg;
   renderCounts();
   renderCases();
@@ -260,9 +409,36 @@ function renderActions(item) {
   $$('[data-reject]', host).forEach((button) => button.addEventListener("click", () => decideAction(item, button.dataset.reject, "rejected")));
 }
 
-function decideAction(item, actionId, decision) {
-  actionStates.set(`${activeOrg}:${actionId}`, decision);
+async function decideAction(item, actionId, decision) {
   const action = item.actions.find((candidate) => candidate.id === actionId);
+  if (backendConnected && action?.backendAction) {
+    try {
+      const decisionResponse = await fetch(`/api/platform/actions/${encodeURIComponent(actionId)}/decision?organizationId=${encodeURIComponent(activeOrg)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ decision, rationale: `${currentOrganization().user} reviewed the proposal in the operator surface.` }),
+      });
+      if (!decisionResponse.ok) throw new Error((await decisionResponse.json()).error || "Decision failed");
+      let receipt;
+      if (decision === "approved") {
+        const dispatchResponse = await fetch(`/api/platform/actions/${encodeURIComponent(actionId)}/dispatch?organizationId=${encodeURIComponent(activeOrg)}`, { method: "POST" });
+        const dispatch = await dispatchResponse.json();
+        if (!dispatchResponse.ok) throw new Error(dispatch.error || "Dispatch failed");
+        receipt = dispatch.receipt;
+      }
+      await syncOrganizationFromApi(activeOrg);
+      showToast(decision === "approved"
+        ? `Named approval persisted. ${titleCase(receipt.status)} receipt ${receipt.id} recorded; no live provider ran.`
+        : "Action rejection persisted. No provider action ran.");
+      renderCounts();
+      renderCaseDetail();
+      return;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return;
+    }
+  }
+  actionStates.set(`${activeOrg}:${actionId}`, decision);
   if (decision === "approved") {
     item.receipts.unshift({ kind: "simulated", title: `${action.title} approved`, detail: `Approved by ${currentOrganization().user}; provider dispatch simulated`, status: "simulated" });
     item.events.unshift({ title: "Action approved", detail: `${action.title} · named approval recorded.`, time: "Now" });
@@ -276,7 +452,7 @@ function decideAction(item, actionId, decision) {
 
 function renderReminders(item) {
   $("#case-reminders").innerHTML = item.reminders.length ? item.reminders.map((reminder, index) => `
-    <div class="reminder-item"><span class="when">${escapeHtml(reminder.when)}</span><span><strong>${escapeHtml(reminder.title)}</strong><small>${escapeHtml(reminder.detail)}</small></span><button class="text-button" type="button" data-snooze="${index}">Snooze</button></div>`).join("") : "<p class=\"section-meta\">No open reminders.</p>";
+    <div class="reminder-item"><span class="when">${escapeHtml(reminder.when)}</span><span><strong>${escapeHtml(reminder.title)}</strong><small>${escapeHtml(reminder.detail)}</small></span>${backendConnected ? "<span class=\"receipt-status\">persisted</span>" : `<button class="text-button" type="button" data-snooze="${index}">Snooze</button>`}</div>`).join("") : "<p class=\"section-meta\">No open reminders.</p>";
   $$('[data-snooze]', $("#case-reminders")).forEach((button) => button.addEventListener("click", () => {
     const reminder = item.reminders[Number(button.dataset.snooze)];
     reminder.when = "+1h";
@@ -370,16 +546,40 @@ function resetNetworkSteps() {
 function renderNetworkForOrganization() {
   resetNetworkSteps();
   const offer = $("#offer-card");
+  const network = currentOrganization().network;
+  const request = activeOrg === "harbor" ? network?.requests?.[0] : network?.publishedRequests?.[0];
+  if (request) {
+    $(".network-request-header h3").textContent = request.summary.title;
+    $(".shared-summary p").textContent = `${request.summary.need} · ${(request.summary.constraints || []).join(" · ")}`;
+  }
+  const completedHandoff = network?.handoffs?.find((handoff) => handoff.status === "completed");
+  if (completedHandoff && activeOrg === "harbor") {
+    $("#offer-card").hidden = true;
+    $("#grant-card").hidden = true;
+    $("#handoff-receipt").hidden = false;
+    $("#offer-step").className = "flow-step done";
+    $("#grant-step").className = "flow-step done";
+    $("#handoff-step").className = "flow-step done";
+    $("#offer-step-text").textContent = "Persisted offer accepted";
+    $("#grant-step-text").textContent = "Explicit limited-field grant recorded";
+    $("#handoff-step-text").textContent = "Completed in platform state · external updates simulated";
+    $("#handoff-receipt small").textContent = `sim-handoff-${completedHandoff.id} · completed · persisted across refresh`;
+    return;
+  }
   if (activeOrg === "harbor") {
     $(".offer-org strong", offer).textContent = "Mission Valley Shelter";
-    $(".offer-org small", offer).textContent = "Verified partner · replied 8 min ago";
+    $(".offer-org small", offer).textContent = network?.incomingOffers?.length
+      ? "Synthetic partner · persisted capacity offer"
+      : "No persisted capacity offer";
     $(".offer-org .org-avatar", offer).textContent = "MV";
     $("#review-offer").textContent = "Review offer";
     $("#decline-offer").hidden = false;
     $("#review-offer").disabled = false;
   } else {
     $(".offer-org strong", offer).textContent = "Your capacity offer to Harbor Hope";
-    $(".offer-org small", offer).textContent = "Limited request summary · submitted 8 min ago";
+    $(".offer-org small", offer).textContent = network?.offers?.length
+      ? "Limited request summary · persisted offer"
+      : "No persisted offer";
     $(".offer-org .org-avatar", offer).textContent = "MV";
     $("#review-offer").textContent = "Awaiting Harbor Hope";
     $("#decline-offer").hidden = true;
@@ -387,11 +587,17 @@ function renderNetworkForOrganization() {
   }
 }
 
-$("#organization").addEventListener("change", (event) => {
+$("#organization").addEventListener("change", async (event) => {
   activeOrg = event.target.value;
-  activeWorkflow = "adoption";
-  activeCaseId = currentOrganization().cases.adoption[0].id;
-  selectWorkflowTab("adoption");
+  try {
+    await syncOrganizationFromApi(activeOrg);
+  } catch (error) {
+    backendConnected = false;
+    showToast(`Using the offline design fallback: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  activeWorkflow = currentOrganization().cases.foster.length ? "foster" : "adoption";
+  activeCaseId = currentOrganization().cases[activeWorkflow][0].id;
+  selectWorkflowTab(activeWorkflow);
   renderOrganization();
   const currentView = $(".nav-item.is-active").dataset.view;
   activateView(currentView);
@@ -414,8 +620,33 @@ $$("[role=tab]").forEach((tab, index, tabs) => {
   });
 });
 
-$("#add-reminder").addEventListener("click", () => {
+$("#add-reminder").addEventListener("click", async () => {
   const item = currentCase();
+  if (backendConnected) {
+    try {
+      const dueAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+      const response = await fetch(`/api/platform/reminders?organizationId=${encodeURIComponent(activeOrg)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          caseId: item.id,
+          type: "coordinator.checkpoint",
+          dueAt,
+          message: "Coordinator checkpoint added from the shared operator surface.",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Reminder could not be recorded");
+      await syncOrganizationFromApi(activeOrg);
+      showToast(`Reminder ${result.reminder.id} persisted for two hours from now.`);
+      renderCounts();
+      renderCaseDetail();
+      return;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return;
+    }
+  }
   item.reminders.push({ when: "+2h", title: "Coordinator checkpoint", detail: `Added by ${currentOrganization().user}` });
   item.events.unshift({ title: "Reminder scheduled", detail: "Coordinator checkpoint in two hours.", time: "Now" });
   showToast("Reminder added to this case.");
@@ -447,7 +678,7 @@ $("#decline-offer").addEventListener("click", () => {
   showToast("Offer declined. Private data remained unshared.");
 });
 
-$("#approve-grant").addEventListener("click", () => {
+$("#approve-grant").addEventListener("click", async () => {
   const approver = $("#approver-name").value.trim();
   if (!approver) {
     $("#approver-name").setAttribute("aria-invalid", "true");
@@ -456,6 +687,20 @@ $("#approve-grant").addEventListener("click", () => {
     return;
   }
   $("#approver-name").removeAttribute("aria-invalid");
+  if (backendConnected) {
+    try {
+      const response = await fetch(`/api/platform/network/demo-handoff?organizationId=${encodeURIComponent(activeOrg)}`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Handoff could not be recorded");
+      await syncOrganizationFromApi(activeOrg);
+      $("#receipt-approver").textContent = approver;
+      $("#handoff-receipt small").textContent = `${result.receipt.id} · ${result.handoff.status} · allowed fields: ${result.grant.allowedFields.join(", ")}`;
+      showToast(`Persisted ${result.handoff.status} handoff ${result.handoff.id}; external updates remain simulated.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+      return;
+    }
+  }
   $("#grant-card").hidden = true;
   $("#handoff-receipt").hidden = false;
   $("#receipt-approver").textContent = approver;
@@ -466,4 +711,21 @@ $("#approve-grant").addEventListener("click", () => {
   showToast("Share grant and simulated handoff receipt recorded. No live data was sent.");
 });
 
-renderOrganization();
+async function bootstrap() {
+  try {
+    await syncOrganizationFromApi(activeOrg);
+    activeWorkflow = currentOrganization().cases.foster.length ? "foster" : "adoption";
+    activeCaseId = currentOrganization().cases[activeWorkflow][0].id;
+    $(".source-health strong").textContent = "Synthetic API loaded";
+    $(".source-health small").textContent = "Persistent local demo · no live providers";
+  } catch (error) {
+    backendConnected = false;
+    $(".source-health strong").textContent = "Offline design fallback";
+    $(".source-health small").textContent = "API unavailable · changes will not persist";
+    showToast(error instanceof Error ? error.message : String(error));
+  }
+  selectWorkflowTab(activeWorkflow);
+  renderOrganization();
+}
+
+void bootstrap();

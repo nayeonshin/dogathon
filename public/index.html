@@ -123,6 +123,19 @@
     color: var(--dim);
     white-space: nowrap;
   }
+
+  .platform-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--mint);
+    font: 500 12px/1 var(--mono);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    border: 1px solid rgba(79, 240, 171, 0.25);
+    border-radius: 999px;
+    padding: 11px 15px;
+  }
+  .platform-link:hover { border-color: rgba(79, 240, 171, 0.55); }
   .pulse i {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--mint);
@@ -412,7 +425,10 @@
       <h1>Application intake</h1>
       <div class="who" id="who"></div>
     </div>
-    <div class="pulse" id="pulse" hidden><i></i> Listening</div>
+    <div>
+      <a class="platform-link" href="/platform">Shared platform →</a>
+      <div class="pulse" id="pulse" hidden><i></i> Listening</div>
+    </div>
   </header>
 
   <!-- Phase 1: nothing connected. One button, two OAuth flows. -->

@@ -333,6 +333,11 @@ export class RescueOpsPlatformService {
     if (!action.requiresApproval) {
       throw new ValidationError(`Action ${actionId} does not require approval`);
     }
+    if (action.status !== "pending_approval") {
+      throw new ConflictError(`Action ${actionId} cannot request approval from status ${action.status}`, {
+        currentStatus: action.status,
+      });
+    }
     const existing = await this.store.list(
       "approvals",
       actor.organizationId,
