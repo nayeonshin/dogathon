@@ -423,6 +423,7 @@
     border-bottom: 1px solid rgba(79, 240, 171, 0.45);
     padding-bottom: 5px;
   }
+  .side-links { display: flex; gap: 14px; flex-wrap: wrap; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -436,7 +437,10 @@
       <div class="eyebrow">{{ORG}}</div>
       <h1>{{HEADING}}</h1>
       <div class="who" id="who"></div>
-      <a class="side-link" href="{{SIDE_LINK_URL}}">Open foster placement &rarr;</a>
+      <div class="side-links">
+        <a class="side-link" href="{{FORM_URL}}">Open public form</a>
+        <a class="side-link" href="{{SIDE_LINK_URL}}">Open foster placement &rarr;</a>
+      </div>
     </div>
     <div>
       <a class="platform-link" href="{{PLATFORM_URL}}">Shared platform →</a>
@@ -486,6 +490,7 @@
 
 <script type="module">
 const $ = (id) => document.getElementById(id);
+const API = "{{API_PREFIX}}";
 const feed = $("feed");
 let iApp = 0, iSpam = 0, phase = null, chipsRendered = null;
 
@@ -532,7 +537,7 @@ function toolRow(kind, glyph, name, suffix = "") {
 }
 
 async function refresh() {
-  const s = await fetch("/api/state").then((r) => r.json());
+  const s = await fetch(`${API}/state`).then((r) => r.json());
   $("who").textContent = `${s.userId} · #${s.channel}`;
   phase = s.phase;
 
@@ -602,7 +607,7 @@ async function connect(e, provider) {
   const btn = e?.target;
   if (btn) btn.disabled = true;
   const qs = provider ? `?provider=${encodeURIComponent(provider)}` : "";
-  const r = await fetch(`/api/connect${qs}`, { method: "POST" }).then((x) => x.json());
+  const r = await fetch(`${API}/connect${qs}`, { method: "POST" }).then((x) => x.json());
 
   if (!r.ok) {
     text("err", "!", r.error ?? "Could not start authorization");
@@ -632,7 +637,7 @@ $("setgw").addEventListener("click", async (e) => {
   const url = $("gw").value.trim();
   if (!url) return;
   e.target.disabled = true;
-  const r = await fetch("/api/gateway", {
+  const r = await fetch(`${API}/gateway`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ url }),
@@ -644,14 +649,14 @@ $("setgw").addEventListener("click", async (e) => {
 
 $("auth").addEventListener("click", async (e) => {
   e.target.disabled = true;
-  const r = await fetch("/api/authorize/gateway", { method: "POST" }).then((x) => x.json());
+  const r = await fetch(`${API}/authorize/gateway`, { method: "POST" }).then((x) => x.json());
   if (r.url) window.open(r.url, "_blank", "noopener");
   else text("err", "!", r.error ?? "No authorization URL returned");
   setTimeout(() => { e.target.disabled = false; refresh(); }, 1500);
 });
 
 async function send(kind, i) {
-  const r = await fetch(`/api/demo-email?kind=${kind}&i=${i}`, { method: "POST" }).then((x) => x.json());
+  const r = await fetch(`${API}/demo-email?kind=${kind}&i=${i}`, { method: "POST" }).then((x) => x.json());
   if (!r.ok) text("err", "!", r.error ?? "Send failed");
 }
 
@@ -669,7 +674,7 @@ $("spam").addEventListener("click", async (e) => {
 
 const LEVEL = { info: ["note", "·"], warn: ["warn", "!"], error: ["err", "!"] };
 
-new EventSource("/api/events").onmessage = (msg) => {
+new EventSource(`${API}/events`).onmessage = (msg) => {
   const f = JSON.parse(msg.data);
 
   if (f.type === "log") {
