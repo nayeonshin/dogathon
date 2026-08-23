@@ -37,7 +37,13 @@ for several dogs over time, so RescueOps saves an approved foster profile and
 reuses it when a compatible dog needs placement. In the synthetic demo, Maya
 fosters Luna temporarily; she is not adopting Luna.
 
+### Public shelter
+
 ![MNR Dog Shelter public landing page](docs/images/landing-page.png)
+
+### Staff RescueOps
+
+![MNR RescueOps operations dashboard](docs/images/rescueops-dashboard.png)
 
 ```
 public form  ──▶  Gmail  ──▶  poller (Arcade SDK)  ──▶  agent (MCP gateway)  ──┬─▶ Google Sheet
