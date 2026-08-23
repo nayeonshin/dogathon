@@ -1,5 +1,7 @@
 # MNR Dog Shelter / RescueOps
 
+**Live demo:** [https://dogathon-dun.vercel.app](https://dogathon-dun.vercel.app)
+
 An **ambient agent**: nobody prompts it. A dog rescue's adoption form emails an
 intake mailbox, a local server notices, and an agent handles the application end
 to end — appends a row to a Google Sheet, posts to Slack, books a meet-and-greet,
@@ -20,6 +22,22 @@ A companion **Foster Application Intake** runs at
 foster-intake agent records qualified homes in the foster roster, alerts Slack,
 books a home visit, and drafts a reply. Together the demos cover intake first,
 then trustworthy placement coordination.
+
+## Adoption vs. fostering
+
+These are two different commitments that begin with separate public forms:
+
+| Application | What the person is offering | What RescueOps evaluates |
+| --- | --- | --- |
+| **Adoption** | A permanent home and long-term ownership of one dog | Household fit, lifestyle, care plan, and readiness for a meet-and-greet |
+| **Fostering** | A temporary home while the shelter continues supporting the dog and looking for a permanent adopter | Current availability, capacity, experience, transport, preferences, and restrictions |
+
+An adopter applies for a lasting match. A foster volunteer may temporarily care
+for several dogs over time, so RescueOps saves an approved foster profile and
+reuses it when a compatible dog needs placement. In the synthetic demo, Maya
+fosters Luna temporarily; she is not adopting Luna.
+
+![MNR Dog Shelter public landing page](docs/images/landing-page.png)
 
 ```
 public form  ──▶  Gmail  ──▶  poller (Arcade SDK)  ──▶  agent (MCP gateway)  ──┬─▶ Google Sheet
